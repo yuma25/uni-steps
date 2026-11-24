@@ -6,6 +6,14 @@ import type { Group, NotificationLog } from '../../domain/models';
  */
 export const groupApi = {
   /**
+   * 単一のグループ詳細を取得する．
+   */
+  getGroup: async (groupId: string): Promise<Group> => {
+    const resp = await client.get<Group>(`/api/groups/${groupId}`);
+    return resp.data;
+  },
+
+  /**
    * ユーザーが所属しているグループ一覧を取得する．
    */
   listMyGroups: async (userId: string): Promise<Group[]> => {

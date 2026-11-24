@@ -6,9 +6,18 @@ import { handle } from '../../utils/helpers';
 /**
  * ダッシュボード画面のプレゼンター（状態管理・ViewModel・ユースケース呼び出し）
  */
-export const useDashboardPresenter = (userId: string, groupId: string) => {
+export const useDashboardPresenter = (userId: string, groupId: string, initialGroup?: Group | null) => {
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [group, setGroup] = useState<Group | null>(null);
+  const [group, setGroup] = useState<Group | null>(() => {
+    if (initialGroup) return initialGroup;
+    try {
+      const cached = localStorage.getItem(`cached_group_${groupId}`);
+      if (cached) return JSON.parse(cached);
+    } catch {
+      // ignore
+    }
+    return null;
+  });
   const [activeWakeup, setActiveWakeup] = useState<WakeupCheck | null>(null);
   const [groupWakeups, setGroupWakeups] = useState<WakeupCheck[]>([]);
   const [notificationLogs, setNotificationLogs] = useState<NotificationLog[]>([]);
@@ -24,7 +33,7 @@ export const useDashboardPresenter = (userId: string, groupId: string) => {
     setError(null);
     const [results, err] = await handle(Promise.allSettled([
       taskUsecase.fetchGroupTasks(groupId),
-      groupUsecase.fetchUserGroups(userId),
+      groupUsecase.fetchGroup(groupId),
       wakeupUsecase.fetchUserActive(userId),
       userUsecase.fetchMe(userId),
       wakeupUsecase.fetchGroupActive(groupId),
@@ -38,15 +47,19 @@ export const useDashboardPresenter = (userId: string, groupId: string) => {
       return;
     }
 
-    const [taskDataRes, groupsRes, wakeupsRes, userRes, groupWakeupsRes, logsRes] = results;
+    const [taskDataRes, groupRes, wakeupsRes, userRes, groupWakeupsRes, logsRes] = results;
 
     if (taskDataRes.status === 'fulfilled') {
       setTasks(taskDataRes.value || []);
     }
 
-    if (groupsRes.status === 'fulfilled') {
-      const currentGroup = groupsRes.value?.find(g => g.id === groupId);
-      if (currentGroup) setGroup(currentGroup);
+    if (groupRes.status === 'fulfilled' && groupRes.value) {
+      setGroup(groupRes.value);
+      try {
+        localStorage.setItem(`cached_group_${groupId}`, JSON.stringify(groupRes.value));
+      } catch {
+        // ignore
+      }
     }
 
     if (wakeupsRes.status === 'fulfilled') {

@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/yuma25/Uni-Steps/domain"
@@ -168,6 +170,9 @@ func (r *taskRepository) queryTasks(ctx context.Context, query string, args ...a
 	defer rows.Close()
 
 	var tasks []*domain.Task
+	taskMap := make(map[string]*domain.Task)
+	var taskIDs []string
+
 	for rows.Next() {
 		var t domain.Task
 		var recurrenceRaw sql.NullString
@@ -197,43 +202,45 @@ func (r *taskRepository) queryTasks(ctx context.Context, query string, args ...a
 		if recurrenceRaw.Valid && recurrenceRaw.String != "" && recurrenceRaw.String != "{}" {
 			_ = json.Unmarshal([]byte(recurrenceRaw.String), &t.Recurrence)
 		}
+		t.UserProgress = []*domain.TaskUserProgress{}
 		tasks = append(tasks, &t)
+		taskMap[t.ID] = &t
+		taskIDs = append(taskIDs, t.ID)
 	}
 
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 
-	// 各タスクの UserProgress を取得
-	for _, t := range tasks {
-		progresses, err := r.fetchProgressForTask(ctx, t.ID)
-		if err != nil {
-			return nil, err
-		}
-		t.UserProgress = progresses
+	if len(taskIDs) == 0 {
+		return tasks, nil
 	}
 
-	return tasks, nil
-}
+	// N+1 を防ぐため，全タスクの進捗を一括取得する
+	placeholders := make([]string, len(taskIDs))
+	queryArgs := make([]any, len(taskIDs))
+	for i, id := range taskIDs {
+		placeholders[i] = fmt.Sprintf("$%d", i+1)
+		queryArgs[i] = id
+	}
 
-func (r *taskRepository) fetchProgressForTask(ctx context.Context, taskID string) ([]*domain.TaskUserProgress, error) {
-	query := `
+	progressQuery := fmt.Sprintf(`
 		SELECT tup.task_id, tup.user_id, COALESCE(u.name, ''), tup.is_completed, tup.updated_at
 		FROM task_user_progresses tup
 		LEFT JOIN users u ON tup.user_id = u.id
-		WHERE tup.task_id = $1;
-	`
-	rows, err := r.db.QueryContext(ctx, query, taskID)
+		WHERE tup.task_id IN (%s);
+	`, strings.Join(placeholders, ","))
+
+	pRows, err := r.db.QueryContext(ctx, progressQuery, queryArgs...)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer pRows.Close()
 
-	var progresses []*domain.TaskUserProgress
-	for rows.Next() {
+	for pRows.Next() {
 		var p domain.TaskUserProgress
 		var updatedAt sql.NullTime
-		if err := rows.Scan(
+		if err := pRows.Scan(
 			&p.TaskID,
 			&p.UserID,
 			&p.UserName,
@@ -245,8 +252,10 @@ func (r *taskRepository) fetchProgressForTask(ctx context.Context, taskID string
 		if updatedAt.Valid {
 			p.UpdatedAt = updatedAt.Time
 		}
-		progresses = append(progresses, &p)
+		if t, ok := taskMap[p.TaskID]; ok {
+			t.UserProgress = append(t.UserProgress, &p)
+		}
 	}
 
-	return progresses, rows.Err()
+	return tasks, pRows.Err()
 }

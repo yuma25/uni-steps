@@ -1,12 +1,40 @@
+import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../hooks/useAuth';
+
 /**
  * ログイン画面のコンポーネントである．
+ * 既にログイン済みの場合は，前回の部屋またはグループ選択画面へ自動遷移する．
  */
 const LoginPage = () => {
+  const { userId, user, loading } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!loading && userId && user) {
+      const lastGroupId = localStorage.getItem('uni_steps_last_group_id');
+      if (lastGroupId) {
+        navigate(`/dashboard?group_id=${lastGroupId}`, { replace: true });
+      } else {
+        navigate('/select-group', { replace: true });
+      }
+    }
+  }, [userId, user, loading, navigate]);
+
   const handleGoogleLogin = () => {
     // バックエンドの Google OAuth ログインエンドポイントへリダイレクトする．
     const backendUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
     window.location.href = `${backendUrl}/api/auth/google/login`;
   };
+
+  // 認証チェック中はログインボタンのチラつきを防ぐ
+  if (loading && userId) {
+    return (
+      <div className="full-page-loading">
+        <div className="animate-spin" style={{ width: '32px', height: '32px', border: '3px solid var(--brand)', borderTopColor: 'transparent', borderRadius: '50%' }} />
+      </div>
+    );
+  }
 
   return (
     <div className="login-page-container">

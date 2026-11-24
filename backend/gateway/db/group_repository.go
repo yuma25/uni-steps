@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"strings"
 
 	"github.com/yuma25/Uni-Steps/domain"
 	"github.com/yuma25/Uni-Steps/port"
@@ -180,6 +182,9 @@ func (r *groupRepository) queryGroups(ctx context.Context, query string, args ..
 	defer rows.Close()
 
 	var groups []*domain.Group
+	groupMap := make(map[string]*domain.Group)
+	var groupIDs []string
+
 	for rows.Next() {
 		var g domain.Group
 		var intervalsJSON []byte
@@ -210,42 +215,46 @@ func (r *groupRepository) queryGroups(ctx context.Context, query string, args ..
 		if len(intervalsJSON) > 0 {
 			_ = json.Unmarshal(intervalsJSON, &g.RemindIntervals)
 		}
+		g.Users = []*domain.User{}
 		groups = append(groups, &g)
+		groupMap[g.ID] = &g
+		groupIDs = append(groupIDs, g.ID)
 	}
 
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 
-	// 各グループのメンバー一覧（Users）を取得
-	for _, g := range groups {
-		users, err := r.fetchUsersForGroup(ctx, g.ID)
-		if err != nil {
-			return nil, err
-		}
-		g.Users = users
+	if len(groupIDs) == 0 {
+		return groups, nil
 	}
 
-	return groups, nil
-}
+	// N+1 を防ぐため，各グループのメンバー一覧（Users）を一括取得する
+	placeholders := make([]string, len(groupIDs))
+	queryArgs := make([]any, len(groupIDs))
+	for i, id := range groupIDs {
+		placeholders[i] = fmt.Sprintf("$%d", i+1)
+		queryArgs[i] = id
+	}
 
-func (r *groupRepository) fetchUsersForGroup(ctx context.Context, groupID string) ([]*domain.User, error) {
-	query := `
-		SELECT u.id, u.name, u.email, u.web_push_token
+	userQuery := fmt.Sprintf(`
+		SELECT ug.group_id, u.id, u.name, u.email, u.web_push_token
 		FROM users u
 		JOIN user_groups ug ON ug.user_id = u.id
-		WHERE ug.group_id = $1;
-	`
-	rows, err := r.db.QueryContext(ctx, query, groupID)
+		WHERE ug.group_id IN (%s);
+	`, strings.Join(placeholders, ","))
+
+	uRows, err := r.db.QueryContext(ctx, userQuery, queryArgs...)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer uRows.Close()
 
-	var users []*domain.User
-	for rows.Next() {
+	for uRows.Next() {
+		var groupID string
 		var u domain.User
-		if err := rows.Scan(
+		if err := uRows.Scan(
+			&groupID,
 			&u.ID,
 			&u.Name,
 			&u.Email,
@@ -253,8 +262,10 @@ func (r *groupRepository) fetchUsersForGroup(ctx context.Context, groupID string
 		); err != nil {
 			return nil, err
 		}
-		users = append(users, &u)
+		if g, ok := groupMap[groupID]; ok {
+			g.Users = append(g.Users, &u)
+		}
 	}
 
-	return users, rows.Err()
+	return groups, uRows.Err()
 }

@@ -115,6 +115,15 @@ func (uc *GroupUsecase) ListUserGroups(ctx context.Context, userID string) ([]*d
 	return groups, nil
 }
 
+// GetGroup は指定されたIDのグループ詳細を取得する．
+func (uc *GroupUsecase) GetGroup(ctx context.Context, groupID string) (*domain.Group, error) {
+	group, err := uc.groupRepo.FindByID(ctx, groupID)
+	if err != nil {
+		return nil, fmt.Errorf("グループ情報の取得に失敗した： %w", err)
+	}
+	return group, nil
+}
+
 // UpdateSettings は部屋の設定を更新する．オーナーのみ許可する．
 func (uc *GroupUsecase) UpdateSettings(ctx context.Context, groupID string, userID string, name string, intervals []int, aiCharacter string, lineToken string, lineGroupID string, morningTime string, eveningTime string) error {
 	group, err := uc.groupRepo.FindByID(ctx, groupID)

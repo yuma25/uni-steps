@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, type FormEvent, type MouseEvent } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
-import type { Task, TaskUserProgress } from '../../domain/models';
+import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
+import type { Task, TaskUserProgress, Group } from '../../domain/models';
 import { toLocalISOString } from '../../utils/helpers';
 
 // Hooks & Presenter
@@ -28,8 +28,10 @@ import {
 const DashboardPage = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { userId, user } = useAuth();
+  const location = useLocation();
+  const { userId, user, loading: authLoading } = useAuth();
   const groupId = searchParams.get('group_id') || '';
+  const initialGroup = (location.state as { initialGroup?: Group } | null)?.initialGroup;
   
   // Presenter Hooks
   const { 
@@ -39,7 +41,7 @@ const DashboardPage = () => {
     toggleTaskCompletion, saveTask, deleteTask, syncClassroomTasks,
     updateGroupSettings, transferOwnership, leaveGroup, deleteGroup,
     requestWakeup, checkinWakeup, cancelWakeup,
-  } = useDashboardPresenter(userId, groupId);
+  } = useDashboardPresenter(userId, groupId, initialGroup);
 
   const { 
     notifPermission, handleEnableNotifications, handleSilentResubscribe 
@@ -109,16 +111,25 @@ const DashboardPage = () => {
   }, [syncClassroomTasks, showToast]);
 
   useEffect(() => {
-    if (!userId || !groupId) {
+    if (!authLoading && !userId) {
       navigate('/login');
       return;
     }
+    if (!groupId) {
+      navigate('/select-group');
+      return;
+    }
+
+    // 最後に訪れた部屋IDを保存
+    localStorage.setItem('uni_steps_last_group_id', groupId);
+
     const initialize = async () => {
       await fetchData();
+      // バックグラウンドで同期を実行
       handleSync(true);
     };
     initialize();
-  }, [userId, groupId, navigate, fetchData, handleSync]);
+  }, [userId, groupId, authLoading, navigate, fetchData, handleSync]);
 
   // 設定データが取得できたらフォームに初期値をセットする．
   useEffect(() => {
@@ -238,7 +249,8 @@ const DashboardPage = () => {
         alert("退出に失敗しました．");
         return;
       }
-      navigate(`/select-group?user_id=${userId}`);
+      localStorage.removeItem('uni_steps_last_group_id');
+      navigate('/select-group');
       return;
     }
 
@@ -248,7 +260,8 @@ const DashboardPage = () => {
       alert("部屋の退出に失敗しました．");
       return;
     }
-    navigate(`/select-group?user_id=${userId}`);
+    localStorage.removeItem('uni_steps_last_group_id');
+    navigate('/select-group');
   };
 
   const handleDeleteGroup = async () => {
@@ -258,7 +271,8 @@ const DashboardPage = () => {
       alert("部屋の削除に失敗しました．");
       return;
     }
-    navigate(`/select-group?user_id=${userId}`);
+    localStorage.removeItem('uni_steps_last_group_id');
+    navigate('/select-group');
   };
 
   const handleDeleteTask = async (taskId: string) => {
@@ -412,7 +426,7 @@ const DashboardPage = () => {
       header={
         <DashboardHeader 
           group={group}
-          onBack={() => navigate(`/select-group?user_id=${userId}`)}
+          onBack={() => navigate('/select-group')}
           onSync={() => handleSync(false)}
           isSyncing={isProcessing}
           lastSyncedAt={group?.last_synced_at}

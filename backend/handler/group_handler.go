@@ -19,6 +19,7 @@ func NewGroupHandler(e *echo.Echo, gu *usecase.GroupUsecase) {
 		groupUsecase: gu,
 	}
 	e.POST("/api/groups", h.CreateGroup)
+	e.GET("/api/groups/:groupId", h.GetGroup)
 	e.POST("/api/groups/join", h.JoinGroupByInviteCode)
 	e.GET("/api/users/:userId/groups", h.ListUserGroups)
 	e.PATCH("/api/groups/:groupId/settings", h.UpdateGroupSettings)
@@ -26,6 +27,19 @@ func NewGroupHandler(e *echo.Echo, gu *usecase.GroupUsecase) {
 	e.DELETE("/api/groups/:groupId", h.DeleteGroup)
 	e.DELETE("/api/groups/:groupId/users/:userId", h.LeaveGroup)
 	e.GET("/api/groups/:groupId/notifications", h.GetNotificationLogs)
+}
+
+// GetGroup は指定されたIDのグループ情報を返す．
+func (h *GroupHandler) GetGroup(c echo.Context) error {
+	groupID := c.Param("groupId")
+	group, err := h.groupUsecase.GetGroup(c.Request().Context(), groupID)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	}
+	if group == nil {
+		return c.JSON(http.StatusNotFound, map[string]string{"error": "グループが見つからない"})
+	}
+	return c.JSON(http.StatusOK, ToGroupResponse(group))
 }
 
 // TransferOwnership はオーナー権限の譲渡リクエストを処理する．

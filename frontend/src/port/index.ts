@@ -10,6 +10,7 @@ export interface ITaskPort {
 }
 
 export interface IGroupPort {
+  getGroup(groupId: string): Promise<Group>;
   listMyGroups(userId: string): Promise<Group[]>;
   createGroup(name: string, ownerId: string): Promise<Group>;
   joinGroup(inviteCode: string, userId: string): Promise<Group>;

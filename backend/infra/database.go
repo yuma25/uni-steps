@@ -139,6 +139,9 @@ func migrate(ctx context.Context, db *sql.DB) error {
 		`DROP INDEX IF EXISTS idx_tasks_external_id;`,
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_group_external ON tasks (group_id, external_id) WHERE external_id <> '';`,
 		`CREATE INDEX IF NOT EXISTS idx_notification_logs_group_id ON notification_logs (group_id);`,
+		`CREATE INDEX IF NOT EXISTS idx_tasks_group_id ON tasks (group_id);`,
+		`CREATE INDEX IF NOT EXISTS idx_user_groups_group_id ON user_groups (group_id);`,
+		`CREATE INDEX IF NOT EXISTS idx_task_user_progresses_task_id ON task_user_progresses (task_id);`,
 	}
 
 	for _, query := range queries {

@@ -9,7 +9,7 @@ import { useGroupSelectionPresenter } from '../../presenter/hooks/useGroupSelect
  */
 const GroupSelectionPage = () => {
   const navigate = useNavigate();
-  const { userId } = useAuth();
+  const { userId, logout, loading: authLoading } = useAuth();
   const { groups, loading, fetchGroups, createGroup, joinGroup } = useGroupSelectionPresenter(userId);
 
   const [newGroupName, setNewGroupName] = useState('');
@@ -18,12 +18,14 @@ const GroupSelectionPage = () => {
   const [showJoinModal, setShowJoinModal] = useState(false);
 
   useEffect(() => {
-    if (!userId) {
+    if (!authLoading && !userId) {
       navigate('/login');
       return;
     }
-    Promise.resolve().then(() => fetchGroups());
-  }, [userId, navigate, fetchGroups]);
+    if (userId) {
+      Promise.resolve().then(() => fetchGroups());
+    }
+  }, [userId, authLoading, navigate, fetchGroups]);
 
   // モーダル表示時に背景スクロールを禁止
   useEffect(() => {
@@ -43,7 +45,8 @@ const GroupSelectionPage = () => {
     const newGroup = await createGroup(newGroupName);
     if (newGroup) {
       setShowCreateModal(false);
-      navigate(`/dashboard?user_id=${userId}&group_id=${newGroup.id}`);
+      localStorage.setItem('uni_steps_last_group_id', newGroup.id);
+      navigate(`/dashboard?group_id=${newGroup.id}`, { state: { initialGroup: newGroup } });
     }
   };
 
@@ -53,16 +56,19 @@ const GroupSelectionPage = () => {
     const joinedGroup = await joinGroup(inviteCode);
     if (joinedGroup) {
       setShowJoinModal(false);
-      navigate(`/dashboard?user_id=${userId}&group_id=${joinedGroup.id}`);
+      localStorage.setItem('uni_steps_last_group_id', joinedGroup.id);
+      navigate(`/dashboard?group_id=${joinedGroup.id}`, { state: { initialGroup: joinedGroup } });
     }
   };
 
   const selectGroup = (groupId: string) => {
-    navigate(`/dashboard?user_id=${userId}&group_id=${groupId}`);
+    const targetGroup = groups.find(g => g.id === groupId);
+    localStorage.setItem('uni_steps_last_group_id', groupId);
+    navigate(`/dashboard?group_id=${groupId}`, { state: { initialGroup: targetGroup } });
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('user_id');
+    logout();
     navigate('/login');
   };
 

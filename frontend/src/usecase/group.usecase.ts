@@ -16,6 +16,10 @@ export class GroupUsecase {
     return this.groupPort.joinGroup(inviteCode, userId);
   }
 
+  async fetchGroup(groupId: string): Promise<Group> {
+    return this.groupPort.getGroup(groupId);
+  }
+
   async fetchUserGroups(userId: string): Promise<Group[]> {
     return this.groupPort.listMyGroups(userId);
   }
