@@ -1,8 +1,8 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import LoginPage from './pages/LoginPage';
-import DashboardPage from './pages/DashboardPage';
-import GroupSelectionPage from './pages/GroupSelectionPage';
-import { AuthProvider } from './context/AuthContext';
+import LoginPage from './view/pages/LoginPage';
+import DashboardPage from './view/pages/DashboardPage';
+import GroupSelectionPage from './view/pages/GroupSelectionPage';
+import { AuthProvider } from './view/context/AuthContext';
 import './App.css';
 
 // アプリケーションのメインコンポーネントである．

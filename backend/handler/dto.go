@@ -141,6 +141,7 @@ func ToTaskResponse(t *domain.Task) *TaskResponse {
 		resp.UserProgress = append(resp.UserProgress, &TaskUserProgressResponse{
 			TaskID:      p.TaskID,
 			UserID:      p.UserID,
+			UserName:    p.UserName,
 			IsCompleted: p.IsCompleted,
 			UpdatedAt:   p.UpdatedAt,
 		})
@@ -191,6 +192,7 @@ func (req *TaskRequest) ToDomain() *domain.Task {
 		t.UserProgress = append(t.UserProgress, &domain.TaskUserProgress{
 			TaskID:      p.TaskID,
 			UserID:      p.UserID,
+			UserName:    p.UserName,
 			IsCompleted: p.IsCompleted,
 			UpdatedAt:   p.UpdatedAt,
 		})

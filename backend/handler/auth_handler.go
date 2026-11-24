@@ -2,9 +2,11 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -30,12 +32,23 @@ func NewAuthHandler(e *echo.Echo, ur port.UserRepository, cfg *oauth2.Config) {
 	e.GET("/api/auth/google/callback", h.GoogleCallback)
 }
 
+// getOAuthConfig はホスト名に応じて適切な RedirectURL を設定した OAuth 設定を返す．
+// 開発環境（localhost）からのリクエスト時は自動でローカル用 URL を割り当てる．
+func (h *AuthHandler) getOAuthConfig(c echo.Context) oauth2.Config {
+	cfg := *h.oauthCfg
+	host := c.Request().Host
+	if strings.HasPrefix(host, "localhost") || strings.HasPrefix(host, "127.0.0.1") {
+		cfg.RedirectURL = fmt.Sprintf("http://%s/api/auth/google/callback", host)
+	}
+	return cfg
+}
+
 // GoogleLogin は Google の認可画面へリダイレクトする．
 func (h *AuthHandler) GoogleLogin(c echo.Context) error {
 	// CSRF 対策としてランダムな文字列（state）を生成する．
 	state := uuid.New().String()
 
-	isProduction := os.Getenv("GO_ENV") == "production"
+	isSecure := os.Getenv("GO_ENV") == "production" || c.Scheme() == "https" || c.Request().Header.Get("X-Forwarded-Proto") == "https"
 
 	// state を Cookie に保存する（ブラウザ側で保持させ，Callback 時に検証する）．
 	cookie := &http.Cookie{
@@ -43,13 +56,14 @@ func (h *AuthHandler) GoogleLogin(c echo.Context) error {
 		Value:    state,
 		Expires:  time.Now().Add(15 * time.Minute), // 15 分間有効
 		HttpOnly: true,                             // JavaScript からアクセス不可
-		Secure:   isProduction,                     // 本番環境（HTTPS）のみ true に自動設定する
+		Secure:   isSecure,                         // HTTPS または本番環境で true
 		Path:     "/",
 		SameSite: http.SameSiteLaxMode,
 	}
 	c.SetCookie(cookie)
 
-	url := h.oauthCfg.AuthCodeURL(state, oauth2.AccessTypeOffline, oauth2.ApprovalForce)
+	cfg := h.getOAuthConfig(c)
+	url := cfg.AuthCodeURL(state, oauth2.AccessTypeOffline, oauth2.ApprovalForce)
 	return c.Redirect(http.StatusTemporaryRedirect, url)
 }
 
@@ -58,7 +72,12 @@ func (h *AuthHandler) GoogleCallback(c echo.Context) error {
 	// state の検証を行う（CSRF 対策）．
 	state := c.QueryParam("state")
 	cookie, err := c.Cookie("oauth_state")
-	if err != nil || state == "" || state != cookie.Value {
+	if err != nil {
+		log.Printf("[AuthHandler] Cookie取得エラー (oauth_state が存在しない/ブロックされた): %v", err)
+		return c.JSON(http.StatusForbidden, map[string]string{"error": "不正なリクエスト（state 不一致: Cookieが送信されませんでした）が検出された"})
+	}
+	if state == "" || state != cookie.Value {
+		log.Printf("[AuthHandler] state 不一致: queryState=%s, cookieState=%s", state, cookie.Value)
 		return c.JSON(http.StatusForbidden, map[string]string{"error": "不正なリクエスト（state 不一致）が検出された"})
 	}
 
@@ -69,6 +88,8 @@ func (h *AuthHandler) GoogleCallback(c echo.Context) error {
 		MaxAge:   -1,
 		Path:     "/",
 		HttpOnly: true,
+		Secure:   c.Scheme() == "https" || c.Request().Header.Get("X-Forwarded-Proto") == "https" || os.Getenv("GO_ENV") == "production",
+		SameSite: http.SameSiteLaxMode,
 	})
 
 	code := c.QueryParam("code")
@@ -76,14 +97,16 @@ func (h *AuthHandler) GoogleCallback(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "認可コードが提供されていない"})
 	}
 
+	cfg := h.getOAuthConfig(c)
+
 	// 認可コードをアクセストークンと交換する．
-	token, err := h.oauthCfg.Exchange(c.Request().Context(), code)
+	token, err := cfg.Exchange(c.Request().Context(), code)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "トークンの交換に失敗した"})
 	}
 
 	// Google の UserInfo API からユーザーのプロフィールを取得する．
-	client := h.oauthCfg.Client(c.Request().Context(), token)
+	client := cfg.Client(c.Request().Context(), token)
 	resp, err := client.Get("https://www.googleapis.com/oauth2/v3/userinfo")
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "ユーザー情報の取得に失敗した"})
@@ -127,8 +150,9 @@ func (h *AuthHandler) GoogleCallback(c echo.Context) error {
 	}
 
 	// ダッシュボードへリダイレクトする．
+	host := c.Request().Host
 	frontendUrl := os.Getenv("FRONTEND_URL")
-	if frontendUrl == "" {
+	if strings.HasPrefix(host, "localhost") || strings.HasPrefix(host, "127.0.0.1") || frontendUrl == "" {
 		frontendUrl = "http://localhost:5173"
 	}
 	redirectUrl := frontendUrl + "/select-group?user_id=" + user.ID

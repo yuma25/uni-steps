@@ -126,6 +126,7 @@ func (s *GoogleClassroomService) FetchTasks(ctx context.Context, userID string) 
 					UserProgress: []*domain.TaskUserProgress{
 						{
 							UserID:      userID,
+							UserName:    user.Name,
 							IsCompleted: submissionStatus[cw.Id],
 							UpdatedAt:   time.Now(),
 						},
