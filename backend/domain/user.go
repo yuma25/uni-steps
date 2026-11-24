@@ -4,14 +4,14 @@ import (
 	"time"
 )
 
+// User はシステム内のユーザーを表す純粋なドメインエンティティである．
 type User struct {
-	ID                 string    `json:"id" gorm:"primaryKey"`                 // ユーザーの一意識別子（UUID 等）である．
-	Name               string    `json:"name"`                                 // ユーザーの表示名である．
-	Email              string    `json:"email" gorm:"unique"`                  // ユーザーのメールアドレスである（Google ログインのキー）．
-	WebPushToken       string    `json:"web_push_token"`                       // ブラウザ通知用のトークンである．
-	GoogleAccessToken  string    `json:"google_access_token"`                  // Google Classroom 連携用の OAuth アクセストークンである．
-	GoogleRefreshToken string    `json:"google_refresh_token"`                 // Google Classroom 連携用の OAuth リフレッシュトークンである．
-	GoogleTokenExpiry  time.Time `json:"google_token_expiry"`                  // Google OAuth トークンの有効期限である．
-	LastCheckInAt      time.Time `json:"last_check_in_at"`                     // 最終起床確認時刻である．
-	Groups             []*Group  `json:"groups" gorm:"many2many:user_groups;"` // ユーザーが所属しているグループのリストである．
+	ID                 string    // ユーザーを一意に識別するユニークID
+	Name               string    // ユーザーの表示名
+	Email              string    // 連絡先メールアドレス
+	WebPushToken       string    // Web Push通知送信用サブスクリプション情報
+	GoogleAccessToken  string    // Google Classroom API連携用OAuthアクセストークン
+	GoogleRefreshToken string    // OAuthリフレッシュトークン
+	GoogleTokenExpiry  time.Time // OAuthアクセストークン有効期限
+	Groups             []*Group  // 所属しているグループ一覧
 }

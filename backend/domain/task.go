@@ -8,50 +8,50 @@ import (
 )
 
 const (
-	SourceManual          = "manual"           // 手動入力による登録である．
-	SourceGoogleClassroom = "google_classroom" // Google Classroom からの取得である．
-	SourceWebClass        = "web_class"        // Web Class からの取得である．
+	SourceManual          = "manual"           // 手動入力による登録
+	SourceGoogleClassroom = "google_classroom" // Google Classroom からの取得
 )
 
-// RecurrenceSettings は課題の繰り返しに関する設定を保持する構造体である．
-// JSON 形式で一つのカラムに保存される．
+// RecurrenceSettings は課題の定期的な繰り返し配信設定である．
 type RecurrenceSettings struct {
-	Type        string      `json:"type"`         // none, weekly, biweekly, custom
-	CustomDates []time.Time `json:"custom_dates"` // 特定の日付（複数）を指定する場合のリスト
+	Type        string      // 繰り返しの種別（none, weekly, biweekly, custom）
+	CustomDates []time.Time // Typeがcustomの場合に指定される特定日付のリスト
 }
 
-// Task は課題の基本情報を保持する構造体である．
+// Task はグループ内で管理される課題を表す純粋なドメインエンティティである．
 type Task struct {
-	ID               string             `json:"id" gorm:"primaryKey"`                              // 課題の一意識別子である．
-	GroupID          string             `json:"group_id" gorm:"uniqueIndex:idx_group_external"`    // 所属するグループの ID である．
-	Source           string             `json:"source"`                                            // 課題の入力元（manual, ai, google_classroom 等）である．
-	ExternalID       string             `json:"external_id" gorm:"uniqueIndex:idx_group_external"` // 外部 LMS における課題の ID である（重複登録防止用）．
-	RawText          string             `json:"raw_text"`                                          // ユーザーが入力した生の文章である（AI 解析時のみ）．
-	CreatorID        string             `json:"creator_id"`                                        // 課題の作成者のユーザー ID である（手動課題のみ）．
-	Title            string             `json:"title"`                                             // 課題のタイトルである．
-	Deadline         time.Time          `json:"deadline"`                                          // 課題の期限（単発または初回）である．
-	IsLMSDeadlineSet bool               `json:"is_lms_deadline_set"`                               // 外部 LMS 側で期限があらかじめ設定されていたか．
-	LMSUpdateTime    time.Time          `json:"lms_update_time"`                                   // 外部 LMS 側での最終更新日時である．
-	Recurrence       RecurrenceSettings `json:"recurrence" gorm:"serializer:json"`                 // 繰り返しの設定（JSON 形式で統合管理）．
-
-	// Has-Many 関係：タスクごとの各ユーザーの進捗状況
-	UserProgress []*TaskUserProgress `json:"user_progress" gorm:"foreignKey:TaskID"`
+	ID               string              // 課題を一意に識別するUUID
+	GroupID          string              // 所属するグループのID
+	Source           string              // 課題の登録元（manual, google_classroom等）
+	ExternalID       string              // 外部LMS側の課題ID（重複登録防止用）
+	CreatorID        string              // 課題を登録した作成者のユーザーID
+	Title            string              // 課題のタイトル（件名）
+	Subject          string              // 課題の科目名（コース名，例: "統計学", "英語コミュニケーション"）
+	Deadline         time.Time           // 提出締切日時
+	IsLMSDeadlineSet bool                // LMS上で正式に締切日時が設定されているか
+	LMSUpdateTime    time.Time           // LMS側での最終更新日時
+	Recurrence       RecurrenceSettings  // 課題の繰り返し設定
+	UserProgress     []*TaskUserProgress // メンバー全員のこの課題に対する完了状態リスト
 }
 
-// TaskUserProgress はある課題に対する特定のユーザーの完了状態を保持する．
+// TaskUserProgress はある課題に対する特定のユーザーの完了状況である．
 type TaskUserProgress struct {
-	TaskID      string    `json:"task_id" gorm:"primaryKey"`
-	UserID      string    `json:"user_id" gorm:"primaryKey"`
-	UserName    string    `json:"user_name"`    // 画面表示用に保持する．
-	IsCompleted bool      `json:"is_completed"` // そのユーザーが完了したか．
-	UpdatedAt   time.Time `json:"updated_at"`
+	TaskID      string    // 対象の課題ID
+	UserID      string    // 対象のユーザーID
+	IsCompleted bool      // 課題を完了したかどうかのフラグ
+	UpdatedAt   time.Time // 完了状態が最後に更新された日時
 }
 
 // SetupManualDefaults は手動登録時の初期値設定を行う．
 func (t *Task) SetupManualDefaults() {
 	t.Source = SourceManual
 	if t.ID == "" {
-		t.ID = uuid.New().String()
+		id, err := uuid.NewV7()
+		if err == nil {
+			t.ID = id.String()
+		} else {
+			t.ID = uuid.New().String()
+		}
 	}
 	if t.ExternalID == "" {
 		t.ExternalID = t.ID

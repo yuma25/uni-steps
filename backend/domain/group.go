@@ -3,29 +3,30 @@ package domain
 import "time"
 
 const (
-	AICharacterDefault = "default" // 標準的な通知スタイルである．
-	AICharacterStrict  = "strict"  // 厳しい指導官スタイルである．
-	AICharacterKind    = "kind"    // 心配性な幼馴染スタイルである．
-	AICharacterCool    = "cool"    // 冷徹な執事スタイルである．
+	AICharacterDefault = "default" // 標準的な通知スタイル
+	AICharacterStrict  = "strict"  // 厳しい指導官スタイル
+	AICharacterKind    = "kind"    // 心配性な幼馴染スタイル
+	AICharacterCool    = "cool"    // 冷徹な執事スタイル
 )
-
-type Group struct {
-	ID                 string    `json:"id" gorm:"primaryKey"`                    // グループの一意識別子である．
-	Name               string    `json:"name"`                                    // グループの名称である．
-	OwnerID            string    `json:"owner_id"`                                // グループの作成者（オーナー）のユーザー ID である．
-	LineChannelToken   string    `json:"line_channel_token"`                      // オーナーが持ち込んだ LINE Bot のアクセストークンである（BYOT方式）．
-	LineGroupID        string    `json:"line_group_id"`                           // 通知を送信する先の LINE グループ ID である．
-	LastSyncedAt       time.Time `json:"last_synced_at"`                          // 同期処理を最後に実行した時刻である（クールダウン用）．
-	LMSLastUpdatedAt   time.Time `json:"lms_last_updated_at"`                     // 外部 LMS 側で最後に情報が更新された時刻である（差分検知用）．
-	InviteCode         string    `json:"invite_code" gorm:"uniqueIndex"`          // 参加用の招待コードである．
-	RemindIntervals    []int     `json:"remind_intervals" gorm:"serializer:json"` // 何分前に通知するか（複数設定可）
-	AICharacter        string    `json:"ai_character"`                            // AI の性格設定である．
-	SummaryMorningTime string    `json:"summary_morning_time"`                    // 朝のサマリー送信時刻 (HH:mm) である．
-	SummaryEveningTime string    `json:"summary_evening_time"`                    // 夜のサマリー送信時刻 (HH:mm) である．
-	Users              []*User   `json:"users" gorm:"many2many:user_groups;"`     // グループに所属するユーザーのリストである．
-}
 
 const (
-	SummaryTypeMorning = "morning"
-	SummaryTypeEvening = "evening"
+	SummaryTypeMorning = "morning" // 朝の課題サマリー配信
+	SummaryTypeEvening = "evening" // 夕方の課題サマリー配信
 )
+
+// Group は課題や起床見守りを共有するルームを表す純粋なドメインエンティティである．
+type Group struct {
+	ID                 string    // グループを一意に識別するUUID
+	Name               string    // グループ（部屋）の表示名
+	OwnerID            string    // グループを作成・管理するオーナーユーザーのID
+	LineChannelToken   string    // LINE公式アカウントのチャネルアクセストークン
+	LineGroupID        string    // 通知送信先となるLINEグループのID
+	LastSyncedAt       time.Time // 外部LMSと最後に同期を行った日時
+	LMSLastUpdatedAt   time.Time // LMS側で最後に課題更新があった日時
+	InviteCode         string    // 部屋に参加するための招待コード
+	RemindIntervals    []int     // 締切前の通知間隔（分単位の配列，例: [1440, 60]）
+	AICharacter        string    // 通知AIの性格タイプ（default, strict, kind, cool）
+	SummaryMorningTime string    // 朝の課題サマリー送信時刻（例: "08:00"）
+	SummaryEveningTime string    // 夕方の課題サマリー送信時刻（例: "20:00"）
+	Users              []*User   // 参加しているメンバー一覧
+}
