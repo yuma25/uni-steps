@@ -4,16 +4,16 @@ import (
 	"net/http"
 
 	"github.com/labstack/echo/v4"
-	"github.com/yuma25/Uni-Steps/domain"
+	"github.com/yuma25/Uni-Steps/port"
 )
 
 // UserHandler はユーザー情報に関する HTTP リクエストを受け付ける窓口である．
 type UserHandler struct {
-	userRepo domain.UserRepository
+	userRepo port.UserRepository
 }
 
 // NewUserHandler はハンドラーを初期化し，ルーティングを登録する．
-func NewUserHandler(e *echo.Echo, ur domain.UserRepository) {
+func NewUserHandler(e *echo.Echo, ur port.UserRepository) {
 	h := &UserHandler{
 		userRepo: ur,
 	}

@@ -5,17 +5,18 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/yuma25/Uni-Steps/domain"
+	"github.com/yuma25/Uni-Steps/port"
 )
 
 // NotificationHandler は通知設定に関する HTTP リクエストを受け付ける窓口である．
 type NotificationHandler struct {
-	userRepo     domain.UserRepository
-	aiService    domain.AIService
-	notifService domain.NotificationService
+	userRepo     port.UserRepository
+	aiService    port.AIService
+	notifService port.NotificationService
 }
 
 // NewNotificationHandler はハンドラーを初期化し，ルーティングを登録する．
-func NewNotificationHandler(e *echo.Echo, ur domain.UserRepository, ai domain.AIService, ns domain.NotificationService) {
+func NewNotificationHandler(e *echo.Echo, ur port.UserRepository, ai port.AIService, ns port.NotificationService) {
 	h := &NotificationHandler{
 		userRepo:     ur,
 		aiService:    ai,

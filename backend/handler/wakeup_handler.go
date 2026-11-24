@@ -32,7 +32,7 @@ func (h *WakeupHandler) GetActiveGroupChecks(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 	}
-	return c.JSON(http.StatusOK, checks)
+	return c.JSON(http.StatusOK, ToWakeupResponses(checks))
 }
 
 // CancelWakeup は進行中の見守りをキャンセルする．
@@ -62,7 +62,7 @@ func (h *WakeupHandler) GetActiveChecks(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 	}
 
-	return c.JSON(http.StatusOK, checks)
+	return c.JSON(http.StatusOK, ToWakeupResponses(checks))
 }
 
 // RequestWakeupCheck は新しい起床確認を予約する．
@@ -87,7 +87,7 @@ func (h *WakeupHandler) RequestWakeupCheck(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 	}
 
-	return c.JSON(http.StatusCreated, check)
+	return c.JSON(http.StatusCreated, ToWakeupResponse(check))
 }
 
 // CheckIn は起床を報告し，進行中の監視を完了させる．

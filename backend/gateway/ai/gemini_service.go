@@ -73,7 +73,16 @@ func (s *GeminiService) GenerateGroupSummaryMessage(ctx context.Context, workloa
 		characterPrompt = "あなたは親切なチームアシスタントです．"
 	}
 
-	prompt := fmt.Sprintf(`%s　以下のグループ全体の今日の課題状況を見て，朝の挨拶とまとめのメッセージを作成してください．　状況:%s　条件:　- 150文字以内で，簡潔かつ印象的にまとめること．　- メンバー全員の名前を呼びかける必要はなく，チーム全体へのメッセージにすること．　- キャラクター設定を徹底すること．`, characterPrompt, workloadSummary)
+	prompt := fmt.Sprintf(`%s
+以下のグループ全体の課題状況を確認し，時間帯（状況の先頭にある「朝」または「夜・夕」の指定に合わせ，朝なら「おはようございます」，夜・夕方なら「こんばんは」「今日もお疲れ様です」など）にふさわしい挨拶を含めたまとめメッセージを作成してください．
+
+状況:
+%s
+
+条件:
+- 150文字以内で，簡潔かつ印象的にまとめること．
+- メンバー全員の名前を呼びかける必要はなく，チーム全体へのメッセージにすること．
+- キャラクター設定を徹底すること．`, characterPrompt, workloadSummary)
 
 	resp, err := s.model.GenerateContent(ctx, genai.Text(prompt))
 	if err != nil {
