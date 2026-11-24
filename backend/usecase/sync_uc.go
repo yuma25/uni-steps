@@ -7,18 +7,19 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/yuma25/Uni-Steps/domain"
+	"github.com/yuma25/Uni-Steps/port"
 )
 
 // SyncUsecase は外部の学習管理システム（LMS）との同期ロジックを担当する構造体である．
 type SyncUsecase struct {
-	taskRepo   domain.TaskRepository   // 課題データの永続化を担うリポジトリである．
-	groupRepo  domain.GroupRepository  // グループ情報の取得・更新を担うリポジトリである．
-	lmsService domain.LMSService       // 外部 LMS と通信するためのサービスである．
-	scheduler  domain.SchedulerService // リマインド予約を管理するサービスである．
+	taskRepo   port.TaskRepository   // 課題データの永続化を担うリポジトリである．
+	groupRepo  port.GroupRepository  // グループ情報の取得・更新を担うリポジトリである．
+	lmsService port.LMSService       // 外部 LMS と通信するためのサービスである．
+	scheduler  port.SchedulerService // リマインド予約を管理するサービスである．
 }
 
 // NewSyncUsecase は SyncUsecase の新しいインスタンスを生成する．
-func NewSyncUsecase(tr domain.TaskRepository, gr domain.GroupRepository, lms domain.LMSService, sch domain.SchedulerService) *SyncUsecase {
+func NewSyncUsecase(tr port.TaskRepository, gr port.GroupRepository, lms port.LMSService, sch port.SchedulerService) *SyncUsecase {
 	return &SyncUsecase{
 		taskRepo:   tr,
 		groupRepo:  gr,
@@ -42,7 +43,6 @@ func (uc *SyncUsecase) SyncTasks(ctx context.Context, userID string, groupID str
 		return nil, fmt.Errorf("LMS からの課題取得に失敗した： %w", err)
 	}
 
-	// N+1 問題の解消：グループ内の既存課題を一括取得してマップ化する．
 	existingTasks, err := uc.taskRepo.FindByGroupID(ctx, groupID)
 	if err != nil {
 		return nil, fmt.Errorf("既存課題の取得に失敗した： %w", err)
@@ -115,11 +115,12 @@ func (uc *SyncUsecase) SyncTasks(ctx context.Context, userID string, groupID str
 			task.ID = uuid.New().String()
 		}
 
+		// データベースへ保存: 何よりも先に同期した課題をDBに保存する
 		if err := uc.taskRepo.Save(ctx, task); err != nil {
 			return nil, fmt.Errorf("タスク保存失敗： %w", err)
 		}
 
-		// 【予約方式】同期した課題のリマインドを予約（部屋の設定に基づく）
+		// 副作用の実行: DB保存が成功した後にだけ、外部連携を行う（締切前リマインドを予約）
 		// 期限が未来の場合のみ予約する
 		if !task.Deadline.IsZero() && task.Deadline.After(time.Now()) {
 			hasPending := false
@@ -141,10 +142,12 @@ func (uc *SyncUsecase) SyncTasks(ctx context.Context, userID string, groupID str
 		savedTasks = append(savedTasks, task)
 	}
 
+	// 部屋の最終同期日時を更新して保存
 	group.LastSyncedAt = time.Now()
 	group.LMSLastUpdatedAt = maxLMSUpdate
 	_ = uc.groupRepo.Save(ctx, group)
 
+	// 結果の返却: 同期完了した課題リストを返す
 	return savedTasks, nil
 }
 

@@ -3,45 +3,42 @@ package usecase
 import (
 	"context"
 	"fmt"
-	"log"
 
 	"github.com/google/uuid"
 	"github.com/yuma25/Uni-Steps/domain"
+	"github.com/yuma25/Uni-Steps/port"
 )
 
-// GroupUsecase はグループ（部屋）の作成や参加に関するビジネスロジックを担当する構造体である．
+// GroupUsecase はグループ（部屋）の作成や参加に関するビジネスロジックを担当する構造体．
 type GroupUsecase struct {
-	groupRepo domain.GroupRepository           // グループデータの永続化を担うリポジトリである．
-	userRepo  domain.UserRepository            // ユーザー情報を確認するためのリポジトリである．
-	logRepo   domain.NotificationLogRepository // 通知履歴を取得するためのリポジトリである．
+	groupRepo port.GroupRepository           // グループデータの永続化を担うリポジトリ．
+	userRepo  port.UserRepository            // ユーザー情報を確認するためのリポジトリ．
+	logRepo   port.NotificationLogRepository // 通知履歴を取得するためのリポジトリ．
+	summaryUC *SummaryUsecase                // 定期サマリーのタイマー予約を管理するユースケース．
 }
 
 // NewGroupUsecase は GroupUsecase の新しいインスタンスを生成する．
-func NewGroupUsecase(gr domain.GroupRepository, ur domain.UserRepository, lr domain.NotificationLogRepository) *GroupUsecase {
+func NewGroupUsecase(gr port.GroupRepository, ur port.UserRepository, lr port.NotificationLogRepository, su *SummaryUsecase) *GroupUsecase {
 	return &GroupUsecase{
 		groupRepo: gr,
 		userRepo:  ur,
 		logRepo:   lr,
+		summaryUC: su,
 	}
 }
 
 // CreateGroup は新しいグループを作成し，作成者をオーナーとして登録する．
 func (uc *GroupUsecase) CreateGroup(ctx context.Context, name string, ownerID string) (*domain.Group, error) {
-	log.Printf("DEBUG: ユーザー %s によるグループ作成（名前: %s）を開始する．\n", ownerID, name)
-
-	// 1．オーナーとなるユーザーが存在するか確認する．
+	// オーナーとなるユーザーが存在するか確認する．
 	user, err := uc.userRepo.FindByID(ctx, ownerID)
 	if err != nil {
-		log.Printf("ERROR: オーナー検索中にエラーが発生した: %v\n", err)
 		return nil, fmt.Errorf("オーナー情報の取得に失敗した： %w", err)
 	}
 	if user == nil {
-		log.Printf("ERROR: オーナーが見つからない (ID: %s)\n", ownerID)
 		return nil, fmt.Errorf("オーナーとなるユーザーが見つからない")
 	}
 
-	// 2．新しいグループ構造体を作成する．
-	// 招待コードは UUID の先頭 8 文字を簡易的に使用する．
+	// 新しいグループ構造体を作成する．
 	inviteCode := uuid.New().String()[:8]
 
 	group := &domain.Group{
@@ -49,21 +46,26 @@ func (uc *GroupUsecase) CreateGroup(ctx context.Context, name string, ownerID st
 		Name:               name,
 		OwnerID:            ownerID,
 		InviteCode:         inviteCode,
-		RemindIntervals:    []int{1440, 180, 60}, // デフォルト設定：24時間前と3時間前と1時間前
+		RemindIntervals:    []int{1440, 180, 60},
 		AICharacter:        domain.AICharacterDefault,
 		SummaryMorningTime: "06:00",
 		SummaryEveningTime: "22:00",
 		Users:              []*domain.User{},
 	}
 
-	// 3．まずデータベースに「部屋」だけを保存する．
+	// まずデータベースに「部屋」だけを保存する．
 	if err := uc.groupRepo.Save(ctx, group); err != nil {
 		return nil, fmt.Errorf("グループの保存に失敗した： %w", err)
 	}
 
-	// 4．保存された部屋に対して，オーナー（ユーザー）を所属させる．
+	// 保存された部屋に対して，オーナーを所属させる．
 	if err := uc.groupRepo.AddUserToGroup(ctx, group.ID, user.ID); err != nil {
 		return nil, fmt.Errorf("メンバーの紐付けに失敗した： %w", err)
+	}
+
+	// ④ 副作用の実行: DB保存が成功した後にだけ、外部連携を行う（定期サマリータイマーを予約）
+	if uc.summaryUC != nil {
+		uc.summaryUC.ScheduleGroupSummary(ctx, group)
 	}
 
 	return group, nil
@@ -71,7 +73,7 @@ func (uc *GroupUsecase) CreateGroup(ctx context.Context, name string, ownerID st
 
 // JoinGroupByInviteCode は招待コードを用いて既存のグループに参加する．
 func (uc *GroupUsecase) JoinGroupByInviteCode(ctx context.Context, code string, userID string) (*domain.Group, error) {
-	// 1．招待コードに該当するグループを探す．
+	// 招待コードに該当するグループを探す．
 	group, err := uc.groupRepo.FindByInviteCode(ctx, code)
 	if err != nil {
 		return nil, fmt.Errorf("招待コードの検証に失敗した： %w", err)
@@ -80,7 +82,7 @@ func (uc *GroupUsecase) JoinGroupByInviteCode(ctx context.Context, code string, 
 		return nil, fmt.Errorf("無効な招待コードである")
 	}
 
-	// 2．参加するユーザーが存在するか確認する．
+	// 参加するユーザーが存在するか確認する．
 	user, err := uc.userRepo.FindByID(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("ユーザー情報の取得に失敗した： %w", err)
@@ -89,14 +91,14 @@ func (uc *GroupUsecase) JoinGroupByInviteCode(ctx context.Context, code string, 
 		return nil, fmt.Errorf("ユーザーが見つからない")
 	}
 
-	// 3．既に参加していないか確認する．
+	// 既に参加していないか確認する．
 	for _, u := range group.Users {
 		if u.ID == userID {
 			return group, nil // 既に参加済みの場合はそのまま成功とする
 		}
 	}
 
-	// 4．ユーザーをグループに追加して保存する．
+	// ユーザーをグループに追加して保存する．
 	if err := uc.groupRepo.AddUserToGroup(ctx, group.ID, user.ID); err != nil {
 		return nil, fmt.Errorf("グループへの参加に失敗した： %w", err)
 	}
@@ -124,7 +126,7 @@ func (uc *GroupUsecase) UpdateSettings(ctx context.Context, groupID string, user
 	}
 
 	if group.OwnerID != userID {
-		return fmt.Errorf("この部屋の設定を変更する権限がない（オーナーのみ可能）")
+		return fmt.Errorf("この部屋の設定を変更する権限がない")
 	}
 
 	if name != "" {
@@ -136,12 +138,24 @@ func (uc *GroupUsecase) UpdateSettings(ctx context.Context, groupID string, user
 	group.LineGroupID = lineGroupID
 	group.SummaryMorningTime = morningTime
 	group.SummaryEveningTime = eveningTime
-	return uc.groupRepo.Save(ctx, group)
+
+	// ③ データベースへ保存
+	if err := uc.groupRepo.Save(ctx, group); err != nil {
+		return err
+	}
+
+	// ④ 副作用の実行: DB保存が成功した後にだけ、外部連携を行う（タイマーを破棄して再予約）
+	if uc.summaryUC != nil {
+		uc.summaryUC.CancelGroupSummary(ctx, group.ID)
+		uc.summaryUC.ScheduleGroupSummary(ctx, group)
+	}
+
+	return nil
 }
 
 // LeaveGroup はユーザーを部屋から退出させる．
 func (uc *GroupUsecase) LeaveGroup(ctx context.Context, groupID string, userID string) error {
-	// 1．部屋が存在するか確認する．
+	// 部屋が存在するか確認する．
 	group, err := uc.groupRepo.FindByID(ctx, groupID)
 	if err != nil {
 		return err
@@ -150,12 +164,12 @@ func (uc *GroupUsecase) LeaveGroup(ctx context.Context, groupID string, userID s
 		return fmt.Errorf("グループが見つからない")
 	}
 
-	// オーナーが退出する場合は，事前に権譲譲が必要であることを伝える（Usecase レベルではエラーを返す）．
+	// オーナーが退出する場合は，事前に権譲譲が必要であることを伝える．
 	if group.OwnerID == userID && len(group.Users) > 1 {
 		return fmt.Errorf("オーナーは退出前に次のオーナーを指名する必要がある")
 	}
 
-	// 2．リポジトリ経由で紐付けを削除する．
+	// リポジトリ経由で紐付けを削除する．
 	return uc.groupRepo.RemoveUser(ctx, groupID, userID)
 }
 
