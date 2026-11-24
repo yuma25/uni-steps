@@ -38,6 +38,7 @@ type Task struct {
 type TaskUserProgress struct {
 	TaskID      string    // 対象の課題ID
 	UserID      string    // 対象のユーザーID
+	UserName    string    // メンバー名（表示用）
 	IsCompleted bool      // 課題を完了したかどうかのフラグ
 	UpdatedAt   time.Time // 完了状態が最後に更新された日時
 }

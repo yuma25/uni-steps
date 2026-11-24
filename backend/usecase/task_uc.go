@@ -96,16 +96,25 @@ func (uc *TaskUsecase) UpdateTask(ctx context.Context, taskID string, input *dom
 
 	// 秒単位での期限比較（タイムゾーンやミリ秒のズレによる誤判定を防ぐ）
 	isDeadlineChanged := existing.Deadline.Unix() != input.Deadline.Unix()
+	isSubjectChanged := existing.Subject != input.Subject
+	isRecurrenceChanged := existing.Recurrence.Type != input.Recurrence.Type
 
-	if input.Title != existing.Title || isDeadlineChanged {
-		// 手動登録した課題（SourceManual）の場合のみ，作成者またはオーナーに制限する
+	if input.Title != existing.Title || isDeadlineChanged || isSubjectChanged || isRecurrenceChanged {
 		if existing.Source == domain.SourceManual {
 			if !isCreator && !isOwner {
-				return nil, fmt.Errorf("タイトルや期限の変更は，作成者またはオーナーのみ可能である")
+				return nil, fmt.Errorf("タイトルや期限、科目名、繰り返し設定の変更は，作成者またはオーナーのみ可能である")
+			}
+			existing.Title = input.Title
+			existing.Deadline = input.Deadline
+			existing.Recurrence = input.Recurrence
+		} else {
+			// LMS課題の場合、LMSで期限未定の場合のみUni-Steps上で期限を設定・変更可能
+			if !existing.IsLMSDeadlineSet {
+				existing.Deadline = input.Deadline
 			}
 		}
-		existing.Title = input.Title
-		existing.Deadline = input.Deadline
+		// 科目名（授業名）は手動課題・LMS課題を問わず設定・更新可能
+		existing.Subject = input.Subject
 	}
 
 	// 進捗状況（該当者）の更新は，グループメンバーであれば誰でも可能とする（仕様）．

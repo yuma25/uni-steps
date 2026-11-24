@@ -20,22 +20,22 @@ func NewTaskRepository(db *sql.DB) port.TaskRepository {
 
 // Save はタスクを保存または更新し，その進捗状況（UserProgress）を同期する．
 func (r *taskRepository) Save(ctx context.Context, task *domain.Task) error {
-	recurrenceJSON, err := json.Marshal(task.Recurrence)
-	if err != nil {
-		recurrenceJSON = []byte("{}")
-	}
-
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
 
+	recurrenceJSON, err := json.Marshal(task.Recurrence)
+	if err != nil || len(recurrenceJSON) == 0 {
+		recurrenceJSON = []byte("{}")
+	}
+
 	taskQuery := `
 		INSERT INTO tasks (
 			id, group_id, source, external_id, creator_id,
 			title, subject, deadline, is_lms_deadline_set, lms_update_time, recurrence
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb)
 		ON CONFLICT (id) DO UPDATE SET
 			group_id = EXCLUDED.group_id,
 			source = EXCLUDED.source,
@@ -60,7 +60,7 @@ func (r *taskRepository) Save(ctx context.Context, task *domain.Task) error {
 		task.Deadline,
 		task.IsLMSDeadlineSet,
 		task.LMSUpdateTime,
-		recurrenceJSON,
+		string(recurrenceJSON),
 	)
 	if err != nil {
 		return err
@@ -170,7 +170,7 @@ func (r *taskRepository) queryTasks(ctx context.Context, query string, args ...a
 	var tasks []*domain.Task
 	for rows.Next() {
 		var t domain.Task
-		var recurrenceJSON []byte
+		var recurrenceRaw sql.NullString
 		var deadline, lmsUpdate sql.NullTime
 
 		if err := rows.Scan(
@@ -184,7 +184,7 @@ func (r *taskRepository) queryTasks(ctx context.Context, query string, args ...a
 			&deadline,
 			&t.IsLMSDeadlineSet,
 			&lmsUpdate,
-			&recurrenceJSON,
+			&recurrenceRaw,
 		); err != nil {
 			return nil, err
 		}
@@ -194,8 +194,8 @@ func (r *taskRepository) queryTasks(ctx context.Context, query string, args ...a
 		if lmsUpdate.Valid {
 			t.LMSUpdateTime = lmsUpdate.Time
 		}
-		if len(recurrenceJSON) > 0 {
-			_ = json.Unmarshal(recurrenceJSON, &t.Recurrence)
+		if recurrenceRaw.Valid && recurrenceRaw.String != "" && recurrenceRaw.String != "{}" {
+			_ = json.Unmarshal([]byte(recurrenceRaw.String), &t.Recurrence)
 		}
 		tasks = append(tasks, &t)
 	}
@@ -218,9 +218,10 @@ func (r *taskRepository) queryTasks(ctx context.Context, query string, args ...a
 
 func (r *taskRepository) fetchProgressForTask(ctx context.Context, taskID string) ([]*domain.TaskUserProgress, error) {
 	query := `
-		SELECT task_id, user_id, is_completed, updated_at
-		FROM task_user_progresses
-		WHERE task_id = $1;
+		SELECT tup.task_id, tup.user_id, COALESCE(u.name, ''), tup.is_completed, tup.updated_at
+		FROM task_user_progresses tup
+		LEFT JOIN users u ON tup.user_id = u.id
+		WHERE tup.task_id = $1;
 	`
 	rows, err := r.db.QueryContext(ctx, query, taskID)
 	if err != nil {
@@ -235,6 +236,7 @@ func (r *taskRepository) fetchProgressForTask(ctx context.Context, taskID string
 		if err := rows.Scan(
 			&p.TaskID,
 			&p.UserID,
+			&p.UserName,
 			&p.IsCompleted,
 			&updatedAt,
 		); err != nil {
