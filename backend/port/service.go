@@ -31,4 +31,6 @@ type SchedulerService interface {
 	CancelTaskReminds(ctx context.Context, taskID string) error                                                          // 課題完了または削除時に予約済みリマインドタイマーを取消
 	ScheduleWakeupSOS(ctx context.Context, wakeupID string, userID string, groupID string, runAt time.Time) error        // 目標時刻＋猶予時間超過時のSOS通知タイマーを登録
 	CancelWakeupSOS(ctx context.Context, wakeupID string) error                                                          // 起床確認成功時に予約済みSOSタイマーを取消
+	ScheduleSummary(ctx context.Context, groupID string, summaryType string, runAt time.Time, action func()) error       // 指定日時に定期サマリー配信を実行するタイマーを登録
+	CancelSummary(ctx context.Context, groupID string, summaryType string) error                                         // 予約済みの定期サマリー配信タイマーを取消
 }
