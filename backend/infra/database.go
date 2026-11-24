@@ -27,6 +27,16 @@ func InitDB() (*sql.DB, error) {
 		}
 	}
 
+	// Supabase (PgBouncer: ポート6543) の Transaction Pooling で
+	// "prepared statement already exists" (42P05) エラーが発生するのを防止する設定
+	if !strings.Contains(dbURL, "default_query_exec_mode=") {
+		if strings.Contains(dbURL, "?") {
+			dbURL += "&default_query_exec_mode=simple_protocol"
+		} else {
+			dbURL += "?default_query_exec_mode=simple_protocol"
+		}
+	}
+
 	log.Println("データベースへの接続を開始中（最大5秒待機）...")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
