@@ -7,19 +7,20 @@ import (
 	"time"
 
 	"github.com/yuma25/Uni-Steps/domain"
+	"github.com/yuma25/Uni-Steps/port"
 	"golang.org/x/oauth2"
 	"google.golang.org/api/classroom/v1"
 	"google.golang.org/api/option"
 )
 
-// GoogleClassroomService は domain.LMSService インターフェースを実装する構造体である．
+// GoogleClassroomService は port.LMSService インターフェースを実装する構造体である．
 type GoogleClassroomService struct {
-	userRepo domain.UserRepository
+	userRepo port.UserRepository
 	oauthCfg *oauth2.Config
 }
 
 // NewGoogleClassroomService は GoogleClassroomService の新しいインスタンスを生成する．
-func NewGoogleClassroomService(ur domain.UserRepository, cfg *oauth2.Config) *GoogleClassroomService {
+func NewGoogleClassroomService(ur port.UserRepository, cfg *oauth2.Config) *GoogleClassroomService {
 	return &GoogleClassroomService{
 		userRepo: ur,
 		oauthCfg: cfg,
@@ -117,6 +118,7 @@ func (s *GoogleClassroomService) FetchTasks(ctx context.Context, userID string) 
 
 				task := &domain.Task{
 					Title:            cw.Title,
+					Subject:          c.Name,
 					ExternalID:       cw.Id,
 					Deadline:         deadline,
 					IsLMSDeadlineSet: cw.DueDate != nil,
@@ -124,7 +126,6 @@ func (s *GoogleClassroomService) FetchTasks(ctx context.Context, userID string) 
 					UserProgress: []*domain.TaskUserProgress{
 						{
 							UserID:      userID,
-							UserName:    user.Name,
 							IsCompleted: submissionStatus[cw.Id],
 							UpdatedAt:   time.Now(),
 						},
@@ -148,7 +149,7 @@ func (s *GoogleClassroomService) FetchTasks(ctx context.Context, userID string) 
 type persistentTokenSource struct {
 	ctx      context.Context
 	userID   string
-	userRepo domain.UserRepository
+	userRepo port.UserRepository
 	oauthCfg *oauth2.Config
 	source   oauth2.TokenSource
 }

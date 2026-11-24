@@ -83,7 +83,7 @@ func (h *GroupHandler) GetNotificationLogs(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 	}
 
-	return c.JSON(http.StatusOK, logs)
+	return c.JSON(http.StatusOK, ToNotificationLogResponses(logs))
 }
 
 // UpdateGroupSettings は部屋の設定（リマインド間隔など）を更新する．
@@ -128,7 +128,7 @@ func (h *GroupHandler) CreateGroup(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 	}
 
-	return c.JSON(http.StatusCreated, group)
+	return c.JSON(http.StatusCreated, ToGroupResponse(group))
 }
 
 // JoinGroupByInviteCode は招待コードを用いて部屋に参加する．
@@ -146,7 +146,7 @@ func (h *GroupHandler) JoinGroupByInviteCode(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 	}
 
-	return c.JSON(http.StatusOK, group)
+	return c.JSON(http.StatusOK, ToGroupResponse(group))
 }
 
 // ListUserGroups はユーザーが所属するグループ一覧を返す．
@@ -156,5 +156,5 @@ func (h *GroupHandler) ListUserGroups(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 	}
-	return c.JSON(http.StatusOK, groups)
+	return c.JSON(http.StatusOK, ToGroupResponses(groups))
 }

@@ -9,17 +9,18 @@ import (
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 	"github.com/yuma25/Uni-Steps/domain"
+	"github.com/yuma25/Uni-Steps/port"
 	"golang.org/x/oauth2"
 )
 
 // AuthHandler は Google OAuth 2.0 による認証を管理するハンドラーである．
 type AuthHandler struct {
-	userRepo domain.UserRepository // ユーザー情報を保存するためのリポジトリである．
-	oauthCfg *oauth2.Config        // Google OAuth 2.0 の設定情報である．
+	userRepo port.UserRepository // ユーザー情報を保存するためのリポジトリである．
+	oauthCfg *oauth2.Config      // Google OAuth 2.0 の設定情報である．
 }
 
 // NewAuthHandler は AuthHandler を初期化し，ルーティングを登録する．
-func NewAuthHandler(e *echo.Echo, ur domain.UserRepository, cfg *oauth2.Config) {
+func NewAuthHandler(e *echo.Echo, ur port.UserRepository, cfg *oauth2.Config) {
 	h := &AuthHandler{
 		userRepo: ur,
 		oauthCfg: cfg,
@@ -74,13 +75,13 @@ func (h *AuthHandler) GoogleCallback(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "認可コードが提供されていない"})
 	}
 
-	// 1．認可コードをアクセストークンと交換する．
+	// 認可コードをアクセストークンと交換する．
 	token, err := h.oauthCfg.Exchange(c.Request().Context(), code)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "トークンの交換に失敗した"})
 	}
 
-	// 2．Google の UserInfo API からユーザーのプロフィールを取得する．
+	// Google の UserInfo API からユーザーのプロフィールを取得する．
 	client := h.oauthCfg.Client(c.Request().Context(), token)
 	resp, err := client.Get("https://www.googleapis.com/oauth2/v3/userinfo")
 	if err != nil {
@@ -112,7 +113,7 @@ func (h *AuthHandler) GoogleCallback(c echo.Context) error {
 		}
 	}
 
-	// 4．トークン情報を更新して保存する．
+	// トークン情報を更新して保存する．
 	user.GoogleAccessToken = token.AccessToken
 	if token.RefreshToken != "" {
 		user.GoogleRefreshToken = token.RefreshToken
@@ -123,7 +124,7 @@ func (h *AuthHandler) GoogleCallback(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "ユーザー情報の保存に失敗した"})
 	}
 
-	// 5．ダッシュボードへリダイレクトする．
+	// ダッシュボードへリダイレクトする．
 	frontendUrl := os.Getenv("FRONTEND_URL")
 	if frontendUrl == "" {
 		frontendUrl = "http://localhost:5173"

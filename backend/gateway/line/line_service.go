@@ -6,20 +6,20 @@ import (
 	"log"
 
 	"github.com/line/line-bot-sdk-go/v8/linebot/messaging_api"
-	"github.com/yuma25/Uni-Steps/domain"
+	"github.com/yuma25/Uni-Steps/port"
 )
 
-// LineService は domain.NotificationService インターフェースを実装し，
+// LineService は port.NotificationService インターフェースを実装し，
 // LINE Messaging API を使用してグループ通知を送信する構造体である．
 type LineService struct {
-	groupRepo domain.GroupRepository // BYOT 方式のため，グループごとのトークンを取得する．
+	groupRepo port.GroupRepository // BYOT 方式のため，グループごとのトークンを取得する．
 }
 
 // コンパイル時にインターフェースの実装をチェックする．
-var _ domain.NotificationService = (*LineService)(nil)
+var _ port.NotificationService = (*LineService)(nil)
 
 // NewLineService は LineService の新しいインスタンスを生成する．
-func NewLineService(gr domain.GroupRepository) *LineService {
+func NewLineService(gr port.GroupRepository) *LineService {
 	return &LineService{
 		groupRepo: gr,
 	}

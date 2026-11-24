@@ -4,7 +4,6 @@ import (
 	"net/http"
 
 	"github.com/labstack/echo/v4"
-	"github.com/yuma25/Uni-Steps/domain"
 	"github.com/yuma25/Uni-Steps/usecase"
 )
 
@@ -44,19 +43,19 @@ func (h *TaskHandler) DeleteTask(c echo.Context) error {
 func (h *TaskHandler) UpdateTask(c echo.Context) error {
 	taskID := c.Param("id")
 	userID := c.QueryParam("user_id")
-	task := new(domain.Task)
-	if err := c.Bind(task); err != nil {
+	req := new(TaskRequest)
+	if err := c.Bind(req); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "リクエスト形式が不正である"})
 	}
 
-	updatedTask, err := h.taskUsecase.UpdateTask(c.Request().Context(), taskID, task, userID)
+	updatedTask, err := h.taskUsecase.UpdateTask(c.Request().Context(), taskID, req.ToDomain(), userID)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 	}
 	if updatedTask == nil {
 		return c.JSON(http.StatusOK, map[string]string{"message": "担当者がいなくなったため，課題を自動削除した"})
 	}
-	return c.JSON(http.StatusOK, updatedTask)
+	return c.JSON(http.StatusOK, ToTaskResponse(updatedTask))
 }
 
 // ToggleTaskCompletion はユーザーが手動で課題の完了状態を切り替える．
@@ -83,24 +82,22 @@ func (h *TaskHandler) ListTasks(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 	}
-	return c.JSON(http.StatusOK, tasks)
+	return c.JSON(http.StatusOK, ToTaskResponses(tasks))
 }
 
 // CreateManualTask は UI からの直接入力を受け付ける．
 func (h *TaskHandler) CreateManualTask(c echo.Context) error {
-	task := new(domain.Task)
-	if err := c.Bind(task); err != nil {
+	req := new(TaskRequest)
+	if err := c.Bind(req); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "リクエスト形式が不正である"})
 	}
 
-	// フロントエンドから CreatorID が送られていない場合，または明示的に上書きする場合．
-	// ここではリクエストボディに含まれているものを使用する（フロントでセットして送る仕様）．
-
-	createdTask, err := h.taskUsecase.RegisterManualTask(c.Request().Context(), task)
+	createdTask, err := h.taskUsecase.RegisterManualTask(c.Request().Context(), req.ToDomain())
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 	}
-	return c.JSON(http.StatusCreated, createdTask)
+
+	return c.JSON(http.StatusCreated, ToTaskResponse(createdTask))
 }
 
 // SyncTasks は外部 LMS（Google Classroom等）から課題を同期するリクエストを受け付ける．
@@ -126,6 +123,6 @@ func (h *TaskHandler) SyncTasks(c echo.Context) error {
 	// 同期されたタスクのリストを返す．
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"message": "同期完了",
-		"tasks":   syncedTasks,
+		"tasks":   ToTaskResponses(syncedTasks),
 	})
 }

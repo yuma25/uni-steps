@@ -7,19 +7,19 @@ import (
 	"log"
 
 	"github.com/SherClockHolmes/webpush-go"
-	"github.com/yuma25/Uni-Steps/domain"
+	"github.com/yuma25/Uni-Steps/port"
 )
 
 // WebPushService はブラウザに対してネイティブ通知を送るサービスである．
 type WebPushService struct {
-	userRepo   domain.UserRepository // ユーザーの通知トークンを取得するためのリポジトリである．
-	publicKey  string                // VAPID 公開鍵である．
-	privateKey string                // VAPID 秘密鍵である．
-	contact    string                // 連絡先（mailto:メールアドレス等）である．
+	userRepo   port.UserRepository // ユーザーの通知トークンを取得するためのリポジトリである．
+	publicKey  string              // VAPID 公開鍵である．
+	privateKey string              // VAPID 秘密鍵である．
+	contact    string              // 連絡先（mailto:メールアドレス等）である．
 }
 
 // NewWebPushService は WebPushService の新しいインスタンスを生成する．
-func NewWebPushService(ur domain.UserRepository, pubKey, privKey, contact string) *WebPushService {
+func NewWebPushService(ur port.UserRepository, pubKey, privKey, contact string) *WebPushService {
 	return &WebPushService{
 		userRepo:   ur,
 		publicKey:  pubKey,

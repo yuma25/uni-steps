@@ -3,9 +3,9 @@ package notification
 import (
 	"context"
 
-	"github.com/yuma25/Uni-Steps/domain"
-	"github.com/yuma25/Uni-Steps/infrastructure/line"
-	"github.com/yuma25/Uni-Steps/infrastructure/webpush"
+	"github.com/yuma25/Uni-Steps/gateway/line"
+	"github.com/yuma25/Uni-Steps/gateway/webpush"
+	"github.com/yuma25/Uni-Steps/port"
 )
 
 // CompositeNotificationService は LINE と Web Push の両方を束ねて
@@ -15,7 +15,7 @@ type CompositeNotificationService struct {
 	webPushService *webpush.WebPushService // 個人宛の Web Push 通知を担当する．
 }
 
-var _ domain.NotificationService = (*CompositeNotificationService)(nil)
+var _ port.NotificationService = (*CompositeNotificationService)(nil)
 
 // NewCompositeNotificationService は新しい CompositeNotificationService を生成する．
 func NewCompositeNotificationService(ls *line.LineService, wps *webpush.WebPushService) *CompositeNotificationService {

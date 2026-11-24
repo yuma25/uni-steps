@@ -10,22 +10,23 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/yuma25/Uni-Steps/domain"
+	"github.com/yuma25/Uni-Steps/port"
 )
 
 // InMemScheduler はメモリ上でタイマーを管理する SchedulerService の実装である．
 type InMemScheduler struct {
-	taskRepo     domain.TaskRepository
-	userRepo     domain.UserRepository
-	groupRepo    domain.GroupRepository
-	aiService    domain.AIService
-	notifService domain.NotificationService
-	logRepo      domain.NotificationLogRepository
+	taskRepo     port.TaskRepository
+	userRepo     port.UserRepository
+	groupRepo    port.GroupRepository
+	aiService    port.AIService
+	notifService port.NotificationService
+	logRepo      port.NotificationLogRepository
 	timers       map[string]*time.Timer // key: "task:taskID:interval" or "wakeup:wakeupID"
 	mu           sync.Mutex
 }
 
 // NewInMemScheduler は InMemScheduler の新しいインスタンスを生成する．
-func NewInMemScheduler(tr domain.TaskRepository, ur domain.UserRepository, gr domain.GroupRepository, ai domain.AIService, ns domain.NotificationService, lr domain.NotificationLogRepository) *InMemScheduler {
+func NewInMemScheduler(tr port.TaskRepository, ur port.UserRepository, gr port.GroupRepository, ai port.AIService, ns port.NotificationService, lr port.NotificationLogRepository) *InMemScheduler {
 	return &InMemScheduler{
 		taskRepo:     tr,
 		userRepo:     ur,
@@ -92,21 +93,21 @@ func (s *InMemScheduler) ScheduleTaskRemind(ctx context.Context, task *domain.Ta
 			msg = fmt.Sprintf("【リマインド】課題「%s」の期限まであと %d 分です！", currentTask.Title, intervalMinutes)
 		}
 
-		// 未完了の全ユーザーへ同じメッセージを送信
+		// 未完了の全ユーザーへ個別に Web Push を送信
 		for _, uID := range pendingUsers {
 			targetURL := fmt.Sprintf("/dashboard?user_id=%s&group_id=%s", uID, currentTask.GroupID)
 			_ = s.notifService.SendDirectMessage(runCtx, uID, msg, targetURL)
-
-			// 履歴を保存する
-			_ = s.logRepo.Save(runCtx, &domain.NotificationLog{
-				ID:        uuid.New().String(),
-				GroupID:   currentTask.GroupID,
-				UserID:    uID,
-				Type:      domain.NotificationTypeRemind,
-				Message:   msg,
-				CreatedAt: time.Now(),
-			})
 		}
+
+		// グループの通知履歴には重複を避けるため 1 回だけ記録する
+		_ = s.logRepo.Save(runCtx, &domain.NotificationLog{
+			ID:        uuid.New().String(),
+			GroupID:   currentTask.GroupID,
+			UserID:    "system",
+			Type:      domain.NotificationTypeRemind,
+			Message:   msg,
+			CreatedAt: time.Now(),
+		})
 
 		log.Printf("[Scheduler] リマインド送信完了: %s (送信先 %d 人)\n", currentTask.Title, len(pendingUsers))
 
@@ -217,5 +218,51 @@ func (s *InMemScheduler) CancelWakeupSOS(ctx context.Context, wakeupID string) e
 		log.Printf("[Scheduler] SOS 通知予約をキャンセル: ID=%s\n", wakeupID)
 	}
 
+	return nil
+}
+
+// ScheduleSummary は定期サマリー配信のタイマーをセットする．
+func (s *InMemScheduler) ScheduleSummary(ctx context.Context, groupID string, summaryType string, runAt time.Time, action func()) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	key := fmt.Sprintf("summary:%s:%s", groupID, summaryType)
+	if oldTimer, ok := s.timers[key]; ok {
+		oldTimer.Stop()
+	}
+
+	delay := time.Until(runAt)
+	if delay <= 0 {
+		log.Printf("[Scheduler] サマリー配信時刻が過去のため予約をスキップ: GroupID=%s, Type=%s (at %v)\n", groupID, summaryType, runAt)
+		return nil
+	}
+
+	log.Printf("[Scheduler] 定期サマリー配信を予約: GroupID=%s, Type=%s (実行まで %v, 実行日時 %v)\n", groupID, summaryType, delay, runAt)
+
+	timer := time.AfterFunc(delay, func() {
+		s.mu.Lock()
+		delete(s.timers, key)
+		s.mu.Unlock()
+
+		if action != nil {
+			action()
+		}
+	})
+
+	s.timers[key] = timer
+	return nil
+}
+
+// CancelSummary は予約済みの定期サマリー配信を取り消す．
+func (s *InMemScheduler) CancelSummary(ctx context.Context, groupID string, summaryType string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	key := fmt.Sprintf("summary:%s:%s", groupID, summaryType)
+	if timer, ok := s.timers[key]; ok {
+		timer.Stop()
+		delete(s.timers, key)
+		log.Printf("[Scheduler] サマリー配信予約をキャンセル: %s\n", key)
+	}
 	return nil
 }
