@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"os"
 	"time"
@@ -101,6 +102,7 @@ func (h *AuthHandler) GoogleCallback(c echo.Context) error {
 	// 3．メールアドレスを元に，既存ユーザーか新規ユーザーかを判定する．
 	user, err := h.userRepo.FindByEmail(c.Request().Context(), googleUser.Email)
 	if err != nil {
+		log.Printf("[Auth] FindByEmail エラー (email: %s): %v\n", googleUser.Email, err)
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "データベース検索に失敗した"})
 	}
 
