@@ -6,18 +6,19 @@ import (
 	"time"
 
 	"github.com/yuma25/Uni-Steps/domain"
+	"github.com/yuma25/Uni-Steps/port"
 )
 
 // TaskUsecase は課題管理に関するビジネスロジックを担当する構造体である．
 type TaskUsecase struct {
-	taskRepo  domain.TaskRepository   // 課題データの永続化を担うリポジトリである．
-	groupRepo domain.GroupRepository  // グループ設定を取得するためのリポジトリである．
-	aiService domain.AIService        // AI による文章生成（リマインド等）を担うサービスである．
-	scheduler domain.SchedulerService // リマインド予約を管理するサービスである．
+	taskRepo  port.TaskRepository   // 課題データの永続化を担うリポジトリである．
+	groupRepo port.GroupRepository  // グループ設定を取得するためのリポジトリである．
+	aiService port.AIService        // AI による文章生成（リマインド等）を担うサービスである．
+	scheduler port.SchedulerService // リマインド予約を管理するサービスである．
 }
 
 // NewTaskUsecase は TaskUsecase の新しいインスタンスを生成する．
-func NewTaskUsecase(tr domain.TaskRepository, gr domain.GroupRepository, ai domain.AIService, sch domain.SchedulerService) *TaskUsecase {
+func NewTaskUsecase(tr port.TaskRepository, gr port.GroupRepository, ai port.AIService, sch port.SchedulerService) *TaskUsecase {
 	return &TaskUsecase{
 		taskRepo:  tr,
 		groupRepo: gr,
@@ -28,19 +29,20 @@ func NewTaskUsecase(tr domain.TaskRepository, gr domain.GroupRepository, ai doma
 
 // RegisterManualTask は UI から直接入力された情報に基づいて課題を登録するユースケースである．
 func (uc *TaskUsecase) RegisterManualTask(ctx context.Context, task *domain.Task) (*domain.Task, error) {
-	// ドメイン層の初期設定とバリデーションを適用する
+	//　ドメイン層の初期設定とバリデーションを適用する（ダメなら即座に弾く）
 	task.SetupManualDefaults()
 	if err := task.Validate(); err != nil {
 		return nil, err
 	}
 
-	// 作成者 ID はドメインモデルにセットされた状態で渡される（Handler でセット）．
+	// データの準備: 作成者 ID はドメインモデルにセットされた状態で渡される（Handler でセット）
 
+	// データベースへ保存: 何よりも先にDB永続化を確定させる
 	if err := uc.taskRepo.Save(ctx, task); err != nil {
 		return nil, fmt.Errorf("手動タスクの保存に失敗した： %w", err)
 	}
 
-	// 部屋の設定を取得してリマインドを予約する．
+	// 副作用の実行: DB保存が成功した後にだけ、外部連携を行う（タイマー予約など）
 	group, _ := uc.groupRepo.FindByID(ctx, task.GroupID)
 	if group != nil && !task.Deadline.IsZero() && task.Deadline.After(time.Now()) {
 		hasPending := false
@@ -56,6 +58,8 @@ func (uc *TaskUsecase) RegisterManualTask(ctx context.Context, task *domain.Task
 			}
 		}
 	}
+
+	// 結果の返却: 登録された課題オブジェクトを呼び出し元へ返す
 	return task, nil
 }
 
@@ -133,11 +137,12 @@ func (uc *TaskUsecase) UpdateTask(ctx context.Context, taskID string, input *dom
 		return nil, nil // 削除されたことを示すため nil を返す．
 	}
 
+	// データベースへ保存
 	if err := uc.taskRepo.Save(ctx, existing); err != nil {
 		return nil, err
 	}
 
-	// リマインドの再予約
+	// 副作用の実行: DB保存が成功した後にだけ、外部連携を行う（リマインドの再予約・キャンセル）
 	if !existing.Deadline.IsZero() {
 		hasPending := false
 		for _, up := range existing.UserProgress {
@@ -157,6 +162,7 @@ func (uc *TaskUsecase) UpdateTask(ctx context.Context, taskID string, input *dom
 		_ = uc.scheduler.CancelTaskReminds(ctx, taskID)
 	}
 
+	// 結果の返却
 	return existing, nil
 }
 
@@ -230,6 +236,12 @@ func (uc *TaskUsecase) ToggleUserCompletion(ctx context.Context, taskID, userID 
 		}
 	}
 
+	// データベースへ保存（更新された完了状態を保存）
+	if err := uc.taskRepo.Save(ctx, task); err != nil {
+		return err
+	}
+
+	// 副作用の実行: DB保存が成功した後にだけ、外部連携を行う（タイマー解除または再設定）
 	if allCompleted {
 		// 全員完了した場合はタイマーをキャンセル
 		_ = uc.scheduler.CancelTaskReminds(ctx, taskID)
@@ -240,5 +252,6 @@ func (uc *TaskUsecase) ToggleUserCompletion(ctx context.Context, taskID, userID 
 		}
 	}
 
-	return uc.taskRepo.Save(ctx, task)
+	// 結果の返却
+	return nil
 }

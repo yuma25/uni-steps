@@ -7,16 +7,17 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/yuma25/Uni-Steps/domain"
+	"github.com/yuma25/Uni-Steps/port"
 )
 
 // WakeupUsecase は起床確認の登録や判定に関するビジネスロジックを担当する．
 type WakeupUsecase struct {
-	wakeupRepo domain.WakeupRepository
-	scheduler  domain.SchedulerService
+	wakeupRepo port.WakeupRepository
+	scheduler  port.SchedulerService
 }
 
 // NewWakeupUsecase は WakeupUsecase の新しいインスタンスを生成する．
-func NewWakeupUsecase(wr domain.WakeupRepository, sch domain.SchedulerService) *WakeupUsecase {
+func NewWakeupUsecase(wr port.WakeupRepository, sch port.SchedulerService) *WakeupUsecase {
 	return &WakeupUsecase{
 		wakeupRepo: wr,
 		scheduler:  sch,
@@ -25,9 +26,10 @@ func NewWakeupUsecase(wr domain.WakeupRepository, sch domain.SchedulerService) *
 
 // RequestWakeup は新しい起床見守りを予約し，同時にスケジューラーに SOS 発信を登録する．
 func (uc *WakeupUsecase) RequestWakeup(ctx context.Context, userID, groupID string, targetTime time.Time, graceMinutes int) (*domain.WakeupCheck, error) {
-	// 既存のアクティブな見守りがあればキャンセルして上書きする（変更機能）
+	// 既存のアクティブな見守りがあればキャンセルして上書きする
 	_ = uc.CancelWakeup(ctx, userID)
 
+	// データの準備: 新規起床宣言のエンティティを作成
 	check := &domain.WakeupCheck{
 		ID:           uuid.New().String(),
 		UserID:       userID,
@@ -38,17 +40,18 @@ func (uc *WakeupUsecase) RequestWakeup(ctx context.Context, userID, groupID stri
 		CreatedAt:    time.Now(),
 	}
 
-	// 1．データベースに記録を保存する．
+	// データベースへ保存: 何よりも先にDBに記録を保存する
 	if err := uc.wakeupRepo.Save(ctx, check); err != nil {
 		return nil, fmt.Errorf("起床確認の保存に失敗した： %w", err)
 	}
 
-	// 2．スケジューラーに SOS 送信を予約する（起床予定時刻 ＋ 猶予期間）．
+	// 副作用の実行: DB保存が成功した後にだけ、外部連携を行う（スケジューラーに SOS 送信を予約）
 	runAt := targetTime.Add(time.Duration(graceMinutes) * time.Minute)
 	if err := uc.scheduler.ScheduleWakeupSOS(ctx, check.ID, userID, groupID, runAt); err != nil {
 		return nil, fmt.Errorf("SOS 通知の予約に失敗した： %w", err)
 	}
 
+	//  結果の返却
 	return check, nil
 }
 
@@ -78,16 +81,19 @@ func (uc *WakeupUsecase) ConfirmWakeup(ctx context.Context, userID string) error
 	}
 
 	for _, check := range checks {
-		// 1．ステータスを更新する．
+		//  データの準備: ステータスを「起床確認済み」に更新
 		check.Status = domain.WakeupStatusConfirmed
+
+		//  データベースへ保存: 更新後のステータスをDBに保存
 		if err := uc.wakeupRepo.Save(ctx, check); err != nil {
 			continue
 		}
 
-		// 2．スケジューラーの予約（SOS 発信）をキャンセルする．
+		//  副作用の実行: DB保存が成功した後にだけ、外部連携を行う（スケジューラーのSOS予約をキャンセル）
 		_ = uc.scheduler.CancelWakeupSOS(ctx, check.ID)
 	}
 
+	//  結果の返却
 	return nil
 }
 
@@ -98,8 +104,5 @@ func (uc *WakeupUsecase) GetActiveChecks(ctx context.Context, userID string) ([]
 
 // GetActiveGroupChecks は指定されたグループの本日分（または進行中）の起床確認一覧を取得する．
 func (uc *WakeupUsecase) GetActiveGroupChecks(ctx context.Context, groupID string) ([]*domain.WakeupCheck, error) {
-	// リポジトリの FindActiveByGroup は内部でステータスによらず当日分を取得するように実装されているか，
-	// あるいは単に全データを返して Usecase でフィルタリングするのが望ましい．
-	// 現状の実装（domain の定義）に合わせて取得する．
 	return uc.wakeupRepo.FindActiveByGroup(ctx, groupID)
 }
