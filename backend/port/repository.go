@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/yuma25/Uni-Steps/domain"
+	"github.com/yuma25/uni-steps/domain"
 )
 
 // TaskRepository は課題データの永続化に関するインターフェース．

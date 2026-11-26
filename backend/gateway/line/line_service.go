@@ -6,7 +6,7 @@ import (
 	"log"
 
 	"github.com/line/line-bot-sdk-go/v8/linebot/messaging_api"
-	"github.com/yuma25/Uni-Steps/port"
+	"github.com/yuma25/uni-steps/port"
 )
 
 // LineService は port.NotificationService インターフェースを実装し，

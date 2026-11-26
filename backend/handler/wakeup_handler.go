@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/labstack/echo/v4"
-	"github.com/yuma25/Uni-Steps/usecase"
+	"github.com/yuma25/uni-steps/usecase"
 )
 
 // WakeupHandler は起床確認の予約やチェックインを受け付ける窓口である．

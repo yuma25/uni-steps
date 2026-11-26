@@ -10,7 +10,7 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
-	"github.com/yuma25/Uni-Steps/di"
+	"github.com/yuma25/uni-steps/di"
 )
 
 func main() {

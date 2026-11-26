@@ -7,7 +7,7 @@ import (
 	"log"
 
 	"github.com/SherClockHolmes/webpush-go"
-	"github.com/yuma25/Uni-Steps/port"
+	"github.com/yuma25/uni-steps/port"
 )
 
 // WebPushService はブラウザに対してネイティブ通知を送るサービスである．

@@ -1,4 +1,4 @@
-module github.com/yuma25/Uni-Steps
+module github.com/yuma25/uni-steps
 
 go 1.25.8
 

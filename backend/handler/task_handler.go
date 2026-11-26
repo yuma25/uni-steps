@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/labstack/echo/v4"
-	"github.com/yuma25/Uni-Steps/usecase"
+	"github.com/yuma25/uni-steps/usecase"
 )
 
 // TaskHandler は Echo を使った HTTP リクエストの窓口である．

@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/yuma25/Uni-Steps/domain"
-	"github.com/yuma25/Uni-Steps/port"
+	"github.com/yuma25/uni-steps/domain"
+	"github.com/yuma25/uni-steps/port"
 )
 
 // SyncUsecase は外部の学習管理システム（LMS）との同期ロジックを担当する構造体である．

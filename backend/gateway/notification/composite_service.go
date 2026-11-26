@@ -3,9 +3,9 @@ package notification
 import (
 	"context"
 
-	"github.com/yuma25/Uni-Steps/gateway/line"
-	"github.com/yuma25/Uni-Steps/gateway/webpush"
-	"github.com/yuma25/Uni-Steps/port"
+	"github.com/yuma25/uni-steps/gateway/line"
+	"github.com/yuma25/uni-steps/gateway/webpush"
+	"github.com/yuma25/uni-steps/port"
 )
 
 // CompositeNotificationService は LINE と Web Push の両方を束ねて

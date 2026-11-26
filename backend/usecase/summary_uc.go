@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/yuma25/Uni-Steps/domain"
-	"github.com/yuma25/Uni-Steps/port"
+	"github.com/yuma25/uni-steps/domain"
+	"github.com/yuma25/uni-steps/port"
 )
 
 // SummaryUsecase はグループ全体の状況を要約し，通知するロジックを担当する．

@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/yuma25/Uni-Steps/domain"
-	"github.com/yuma25/Uni-Steps/port"
+	"github.com/yuma25/uni-steps/domain"
+	"github.com/yuma25/uni-steps/port"
 )
 
 // InMemScheduler はメモリ上でタイマーを管理する SchedulerService の実装である．

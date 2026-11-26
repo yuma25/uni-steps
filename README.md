@@ -90,4 +90,73 @@ src/
 
 ---
 
+## セットアップ & 実行コマンド 
+
+### 前提条件
+
+- **Go**: 1.22 以上
+- **Node.js**: 20 以上
+- **pnpm**: 推奨（または npm / yarn）
+- **Supabase (PostgreSQL)**: データベース接続情報
+- **Google Gemini API Key**: AI 機能用
+- **LINE Developers**: Messaging API トークン（LINE連携時）
+
+---
+
+### 1. バックエンド (Go)
+
+```bash
+# バックエンドディレクトリへ移動
+cd backend
+
+# 1. 依存関係のインストール
+go mod download
+
+# 2. 環境変数ファイルの準備
+cp .env.example .env
+# .env を編集して各 API キーや DB 接続文字列を設定
+
+# 3. Web Push 用 VAPID キーペアの生成（初回のみ）
+go run scripts/vapid/main.go
+# 出力された VAPID_PUBLIC_KEY と VAPID_PRIVATE_KEY を .env に設定
+
+# 4. AI 連携の動作確認（任意）
+go run scripts/check_ai/main.go
+
+# 5. サーバー起動
+go run main.go
+```
+
+---
+
+### 2. フロントエンド (React + Vite)
+
+```bash
+# フロントエンドディレクトリへ移動
+cd frontend
+
+# 1. 依存関係のインストール
+pnpm install
+# ※ npm を使う場合は npm install
+
+# 2. 開発用サーバーの起動
+pnpm dev
+# 起動後、ブラウザで http://localhost:5173 にアクセス
+
+# 3. リントチェック
+pnpm lint
+
+# 4. 本番用ビルド（TypeScript 型検査 + バンドル）
+pnpm build
+
+# 5. ビルド成果物のローカルプレビュー
+pnpm preview
+```
+
+> [!NOTE]
+> **Web Push 通知の動作要件**
+> Web Push（Service Worker / Push API）はセキュリティ仕様上、**`http://localhost` または `https://`** の環境でのみ機能します。スマートフォンから動作確認を行う場合は、ngrok や Cloudflare Tunnel 等で HTTPS 化するか、iOS の場合は「ホーム画面に追加」（PWA化）した状態でテストを行ってください。
+
+---
+
 *Uni-Steps: Your life rhythm partner.*

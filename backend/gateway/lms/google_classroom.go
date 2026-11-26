@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/yuma25/Uni-Steps/domain"
-	"github.com/yuma25/Uni-Steps/port"
+	"github.com/yuma25/uni-steps/domain"
+	"github.com/yuma25/uni-steps/port"
 	"golang.org/x/oauth2"
 	"google.golang.org/api/classroom/v1"
 	"google.golang.org/api/option"
