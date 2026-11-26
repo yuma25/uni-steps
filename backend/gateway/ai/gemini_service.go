@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/google/generative-ai-go/genai"
-	"github.com/yuma25/Uni-Steps/domain"
+	"github.com/yuma25/uni-steps/domain"
 )
 
 // GeminiService は Google Gemini API を使用して AI サービスを提供する構造体である．

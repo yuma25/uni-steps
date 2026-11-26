@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/yuma25/Uni-Steps/domain"
+	"github.com/yuma25/uni-steps/domain"
 )
 
 // AIService は AI による文章生成に関するインターフェースである．

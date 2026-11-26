@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/labstack/echo/v4"
-	"github.com/yuma25/Uni-Steps/usecase"
+	"github.com/yuma25/uni-steps/usecase"
 )
 
 // GroupHandler はグループ管理に関する HTTP リクエストを受け付ける窓口である．

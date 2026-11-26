@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/yuma25/Uni-Steps/domain"
-	"github.com/yuma25/Uni-Steps/port"
+	"github.com/yuma25/uni-steps/domain"
+	"github.com/yuma25/uni-steps/port"
 )
 
 // TaskUsecase は課題管理に関するビジネスロジックを担当する構造体である．

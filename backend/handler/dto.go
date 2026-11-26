@@ -3,7 +3,7 @@ package handler
 import (
 	"time"
 
-	"github.com/yuma25/Uni-Steps/domain"
+	"github.com/yuma25/uni-steps/domain"
 )
 
 // UserResponse はクライアントへ返却するユーザー情報のDTOである．

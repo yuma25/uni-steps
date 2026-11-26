@@ -8,17 +8,17 @@ import (
 
 	"github.com/google/generative-ai-go/genai"
 	"github.com/labstack/echo/v4"
-	"github.com/yuma25/Uni-Steps/gateway/ai"
-	"github.com/yuma25/Uni-Steps/gateway/db"
-	"github.com/yuma25/Uni-Steps/gateway/line"
-	"github.com/yuma25/Uni-Steps/gateway/lms"
-	"github.com/yuma25/Uni-Steps/gateway/notification"
-	"github.com/yuma25/Uni-Steps/gateway/scheduler"
-	"github.com/yuma25/Uni-Steps/gateway/webpush"
-	"github.com/yuma25/Uni-Steps/handler"
-	"github.com/yuma25/Uni-Steps/infra"
-	"github.com/yuma25/Uni-Steps/port"
-	"github.com/yuma25/Uni-Steps/usecase"
+	"github.com/yuma25/uni-steps/gateway/ai"
+	"github.com/yuma25/uni-steps/gateway/db"
+	"github.com/yuma25/uni-steps/gateway/line"
+	"github.com/yuma25/uni-steps/gateway/lms"
+	"github.com/yuma25/uni-steps/gateway/notification"
+	"github.com/yuma25/uni-steps/gateway/scheduler"
+	"github.com/yuma25/uni-steps/gateway/webpush"
+	"github.com/yuma25/uni-steps/handler"
+	"github.com/yuma25/uni-steps/infra"
+	"github.com/yuma25/uni-steps/port"
+	"github.com/yuma25/uni-steps/usecase"
 	"google.golang.org/api/option"
 )
 
@@ -62,7 +62,11 @@ func NewContainer() (*Container, error) {
 	aiService := ai.NewGeminiService(genaiClient, modelName)
 
 	// 4. Gateway (Notification Services)
-	webPushService := webpush.NewWebPushService(userRepo, os.Getenv("VAPID_PUBLIC_KEY"), os.Getenv("VAPID_PRIVATE_KEY"), "mailto:admin@example.com")
+	vapidContact := os.Getenv("VAPID_CONTACT")
+	if vapidContact == "" {
+		vapidContact = "mailto:admin@example.com"
+	}
+	webPushService := webpush.NewWebPushService(userRepo, os.Getenv("VAPID_PUBLIC_KEY"), os.Getenv("VAPID_PRIVATE_KEY"), vapidContact)
 	lineService := line.NewLineService(groupRepo)
 	compositeNotifService := notification.NewCompositeNotificationService(lineService, webPushService)
 
