@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"strings"
 
 	"github.com/SherClockHolmes/webpush-go"
 	"github.com/yuma25/uni-steps/port"
@@ -20,6 +22,10 @@ type WebPushService struct {
 
 // NewWebPushService は WebPushService の新しいインスタンスを生成する．
 func NewWebPushService(ur port.UserRepository, pubKey, privKey, contact string) *WebPushService {
+	// contact が mailto: や https:// で始まっていなければ mailto: を付与する
+	if contact != "" && !strings.HasPrefix(contact, "mailto:") && !strings.HasPrefix(contact, "https://") {
+		contact = "mailto:" + contact
+	}
 	return &WebPushService{
 		userRepo:   ur,
 		publicKey:  pubKey,
@@ -61,7 +67,7 @@ func (s *WebPushService) SendDirectMessage(ctx context.Context, userID string, m
 		Subscriber:      s.contact,
 		VAPIDPublicKey:  s.publicKey,
 		VAPIDPrivateKey: s.privateKey,
-		TTL:             30, // 30秒間ブラウザに届かなければ破棄する（緊急通知のため短め）
+		TTL:             86400, // 24時間（端末がスリープや画面オフでも復帰時に届くように設定）
 	})
 	if err != nil {
 		return fmt.Errorf("Web Push の送信に失敗した： %w", err)
@@ -69,12 +75,14 @@ func (s *WebPushService) SendDirectMessage(ctx context.Context, userID string, m
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
+		bodyBytes, _ := io.ReadAll(resp.Body)
 		// 410 (Gone) や 404 (Not Found) の場合，トークンが無効なので削除する．
 		if resp.StatusCode == 410 || resp.StatusCode == 404 {
 			_ = s.userRepo.UpdateWebPushToken(ctx, userID, "")
 			log.Printf("[WebPush] 無効なトークンを検知したため削除した．UserID: %s, Status: %d\n", userID, resp.StatusCode)
 		}
-		return fmt.Errorf("Web Push サーバーからエラーが返された： ステータスコード %d", resp.StatusCode)
+		log.Printf("[WebPush] 送信失敗 UserID: %s, Status: %d, Response: %s\n", userID, resp.StatusCode, string(bodyBytes))
+		return fmt.Errorf("Web Push サーバーからエラーが返された： ステータスコード %d (%s)", resp.StatusCode, string(bodyBytes))
 	}
 
 	log.Printf("[WebPush] 通知を正常に送信した．Status: %d, UserID: %s\n", resp.StatusCode, userID)

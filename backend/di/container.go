@@ -62,7 +62,11 @@ func NewContainer() (*Container, error) {
 	aiService := ai.NewGeminiService(genaiClient, modelName)
 
 	// 4. Gateway (Notification Services)
-	webPushService := webpush.NewWebPushService(userRepo, os.Getenv("VAPID_PUBLIC_KEY"), os.Getenv("VAPID_PRIVATE_KEY"), "mailto:admin@example.com")
+	vapidContact := os.Getenv("VAPID_CONTACT")
+	if vapidContact == "" {
+		vapidContact = "mailto:admin@example.com"
+	}
+	webPushService := webpush.NewWebPushService(userRepo, os.Getenv("VAPID_PUBLIC_KEY"), os.Getenv("VAPID_PRIVATE_KEY"), vapidContact)
 	lineService := line.NewLineService(groupRepo)
 	compositeNotifService := notification.NewCompositeNotificationService(lineService, webPushService)
 

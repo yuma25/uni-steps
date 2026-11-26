@@ -96,7 +96,9 @@ func (s *InMemScheduler) ScheduleTaskRemind(ctx context.Context, task *domain.Ta
 		// 未完了の全ユーザーへ個別に Web Push を送信
 		for _, uID := range pendingUsers {
 			targetURL := fmt.Sprintf("/dashboard?user_id=%s&group_id=%s", uID, currentTask.GroupID)
-			_ = s.notifService.SendDirectMessage(runCtx, uID, msg, targetURL)
+			if err := s.notifService.SendDirectMessage(runCtx, uID, msg, targetURL); err != nil {
+				log.Printf("[Scheduler] リマインドWebPush送信失敗 UserID=%s: %v\n", uID, err)
+			}
 		}
 
 		// グループの通知履歴には重複を避けるため 1 回だけ記録する
@@ -178,7 +180,9 @@ func (s *InMemScheduler) ScheduleWakeupSOS(ctx context.Context, wakeupID string,
 		sentCount := 0
 		for _, member := range group.Users {
 			targetURL := fmt.Sprintf("/dashboard?user_id=%s&group_id=%s", member.ID, group.ID)
-			_ = s.notifService.SendDirectMessage(runCtx, member.ID, alertMsg, targetURL)
+			if err := s.notifService.SendDirectMessage(runCtx, member.ID, alertMsg, targetURL); err != nil {
+				log.Printf("[Scheduler] 起床SOS WebPush送信失敗 MemberID=%s: %v\n", member.ID, err)
+			}
 			sentCount++
 		}
 
